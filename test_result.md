@@ -326,7 +326,15 @@ metadata:
   run_ui: false
 
 test_plan:
-  current_focus: []
+  current_focus:
+    - "Onboarding Process - User Profile Creation"
+    - "Dashboard Display and Navigation"
+    - "Food Scanning Feature - Camera and File Upload"
+    - "AI Food Analysis Integration"
+    - "Food Logging and Meal Management"
+    - "Progress Tracking and Weight Entry"
+    - "Navigation Flow and View Transitions"
+    - "Mobile Responsiveness and UI/UX"
   stuck_tasks: []
   test_all: true
   test_priority: "high_first"
