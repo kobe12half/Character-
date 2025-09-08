@@ -1,0 +1,74 @@
+{
+  "summary": {
+    "passed": 6,
+    "total": 9,
+    "success_rate": "66.7%"
+  },
+  "results": [
+    {
+      "test": "Health Check",
+      "success": true,
+      "details": "API is healthy",
+      "response_data": null,
+      "timestamp": "2025-09-08T13:58:37.701605"
+    },
+    {
+      "test": "User Creation & TDEE Calculation",
+      "success": true,
+      "details": "User created with correct TDEE: 2890 cal, Macros: 216p/252c/112f",
+      "response_data": null,
+      "timestamp": "2025-09-08T13:58:39.120950"
+    },
+    {
+      "test": "Get User Profile",
+      "success": false,
+      "details": "Status code: 500",
+      "response_data": "Internal Server Error",
+      "timestamp": "2025-09-08T13:58:40.176610"
+    },
+    {
+      "test": "Food Image Analysis",
+      "success": true,
+      "details": "AI analysis successful. Detected: Unknown Food, 300 cal, confidence: low",
+      "response_data": null,
+      "timestamp": "2025-09-08T13:58:42.806978"
+    },
+    {
+      "test": "Food Logging",
+      "success": true,
+      "details": "Food log created with correct totals: 360 cal, 20.0p/30.0c/18.0f",
+      "response_data": null,
+      "timestamp": "2025-09-08T13:58:43.896118"
+    },
+    {
+      "test": "Get Food Logs",
+      "success": false,
+      "details": "Status code: 500",
+      "response_data": "Internal Server Error",
+      "timestamp": "2025-09-08T13:58:44.948701"
+    },
+    {
+      "test": "Weight Tracking",
+      "success": true,
+      "details": "Weight entry created: 60.5kg on 2025-09-08",
+      "response_data": null,
+      "timestamp": "2025-09-08T13:58:46.019053"
+    },
+    {
+      "test": "Get Weight Entries",
+      "success": false,
+      "details": "Status code: 500",
+      "response_data": "Internal Server Error",
+      "timestamp": "2025-09-08T13:58:47.080166"
+    },
+    {
+      "test": "Daily Stats",
+      "success": true,
+      "details": "Daily stats retrieved: 360/2890 calories",
+      "response_data": null,
+      "timestamp": "2025-09-08T13:58:48.138613"
+    }
+  ],
+  "backend_url": "https://gain-weight-guide.preview.emergentagent.com/api",
+  "test_timestamp": "2025-09-08T13:58:49.140695"
+}
