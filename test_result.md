@@ -446,9 +446,18 @@ metadata:
   run_ui: true
 
 test_plan:
-  current_focus: []
+  current_focus:
+    - "Enhanced Food Logging with Gamification"
+    - "Enhanced Weight Entries with Gamification"
+    - "Points System Calculation"
+    - "Streak Tracking System"
+    - "Badge System - 10 Different Badges"
+    - "User Statistics API"
+    - "Achievement API System"
+    - "Enhanced Daily Stats with Gamification"
+    - "Leaderboard System"
   stuck_tasks: []
-  test_all: true
+  test_all: false
   test_priority: "high_first"
 
 agent_communication:
