@@ -803,10 +803,13 @@ async def get_leaderboard(limit: int = 10):
             {"_id": 0, "name": 1, "total_points": 1, "current_streak": 1, "badges_earned": 1}
         ).sort("total_points", -1).limit(limit).to_list(limit)
         
-        # Add ranking
+        # Add ranking and ensure all fields are present
         for i, user in enumerate(users):
             user['rank'] = i + 1
-            user['badge_count'] = len(user.get('badges_earned', []))
+            user['total_points'] = user.get('total_points', 0)
+            user['current_streak'] = user.get('current_streak', 0)
+            user['badges_earned'] = user.get('badges_earned', [])
+            user['badge_count'] = len(user['badges_earned'])
         
         return users
     except Exception as e:
