@@ -1200,16 +1200,16 @@ class WeightGainAppTester:
 
 if __name__ == "__main__":
     tester = WeightGainAppTester()
-    passed, total, results = tester.run_gamification_tests()
+    passed, total, results = tester.run_smart_coaching_tests()
     
     # Save detailed results
-    with open("/app/gamification_test_results.json", "w") as f:
+    with open("/app/smart_coaching_test_results.json", "w") as f:
         json.dump({
             "summary": {"passed": passed, "total": total, "success_rate": f"{(passed/total)*100:.1f}%"},
             "results": results,
             "backend_url": BACKEND_URL,
             "test_timestamp": datetime.now().isoformat(),
-            "test_focus": "Gamification System - Phase 2"
+            "test_focus": "Smart Coaching System - Phase 3"
         }, f, indent=2)
     
-    print(f"\n📝 Detailed results saved to gamification_test_results.json")
+    print(f"\n📝 Detailed results saved to smart_coaching_test_results.json")
