@@ -4,13 +4,17 @@ import './App.css';
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
 
 function App() {
-  const [currentView, setCurrentView] = useState('onboarding'); // onboarding, dashboard, camera, profile
+  const [currentView, setCurrentView] = useState('onboarding'); // onboarding, dashboard, camera, profile, achievements
   const [user, setUser] = useState(null);
   const [dailyStats, setDailyStats] = useState(null);
+  const [userStats, setUserStats] = useState(null);
   const [weightEntries, setWeightEntries] = useState([]);
   const [foodLogs, setFoodLogs] = useState([]);
+  const [achievements, setAchievements] = useState([]);
+  const [badges, setBadges] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [notification, setNotification] = useState('');
   
   // Camera states
   const [cameraMode, setCameraMode] = useState(false);
@@ -33,7 +37,20 @@ function App() {
       setCurrentView('dashboard');
       loadDashboardData(userData.user_id);
     }
+    loadBadges();
   }, []);
+
+  const loadBadges = async () => {
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/badges`);
+      if (response.ok) {
+        const badgeData = await response.json();
+        setBadges(badgeData);
+      }
+    } catch (error) {
+      console.error('Error loading badges:', error);
+    }
+  };
 
   const loadDashboardData = async (userId) => {
     try {
@@ -42,6 +59,13 @@ function App() {
       if (statsResponse.ok) {
         const stats = await statsResponse.json();
         setDailyStats(stats);
+      }
+
+      // Load user stats
+      const userStatsResponse = await fetch(`${BACKEND_URL}/api/user-stats/${userId}`);
+      if (userStatsResponse.ok) {
+        const userStatsData = await userStatsResponse.json();
+        setUserStats(userStatsData);
       }
 
       // Load food logs
@@ -57,9 +81,21 @@ function App() {
         const entries = await weightResponse.json();
         setWeightEntries(entries);
       }
+
+      // Load achievements
+      const achievementsResponse = await fetch(`${BACKEND_URL}/api/achievements/${userId}`);
+      if (achievementsResponse.ok) {
+        const achievementsData = await achievementsResponse.json();
+        setAchievements(achievementsData);
+      }
     } catch (error) {
       console.error('Error loading dashboard data:', error);
     }
+  };
+
+  const showNotification = (message, type = 'success') => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(''), 4000);
   };
 
   const handleOnboarding = async (formData) => {
@@ -79,6 +115,7 @@ function App() {
         localStorage.setItem('weightGainUser', JSON.stringify(result.user));
         setCurrentView('dashboard');
         await loadDashboardData(result.user.user_id);
+        showNotification('Welcome! Your profile has been created successfully! 🎉');
       } else {
         throw new Error('Failed to create user profile');
       }
@@ -195,6 +232,19 @@ function App() {
       });
 
       if (response.ok) {
+        const result = await response.json();
+        
+        // Show success notification with points
+        let message = `Food logged successfully! +${result.points_earned} points`;
+        if (result.new_badges.length > 0) {
+          message += ` • New badges earned! 🏆`;
+        }
+        if (result.current_streak > 1) {
+          message += ` • ${result.current_streak} day streak! 🔥`;
+        }
+        
+        showNotification(message);
+        
         setCapturedImage(null);
         setNutritionData(null);
         setCurrentView('dashboard');
@@ -226,11 +276,24 @@ function App() {
       });
 
       if (response.ok) {
+        const result = await response.json();
+        showNotification(`Weight logged! +${result.points_earned} points 📊`);
         await loadDashboardData(user.user_id);
       }
     } catch (error) {
       setError('Failed to add weight entry: ' + error.message);
     }
+  };
+
+  const renderNotification = () => {
+    if (!notification) return null;
+    
+    return (
+      <div className={`notification ${notification.type}`}>
+        <span>{notification.message}</span>
+        <button onClick={() => setNotification('')}>×</button>
+      </div>
+    );
   };
 
   const renderOnboarding = () => (
@@ -247,7 +310,7 @@ function App() {
   );
 
   const renderDashboard = () => {
-    if (!user || !dailyStats) return <div className="loading">Loading dashboard...</div>;
+    if (!user || !dailyStats || !userStats) return <div className="loading">Loading dashboard...</div>;
 
     const calorieProgress = (dailyStats.total_calories / dailyStats.calorie_target) * 100;
     const proteinProgress = (dailyStats.total_protein / dailyStats.protein_target) * 100;
@@ -255,8 +318,20 @@ function App() {
     return (
       <div className="dashboard-container">
         <header className="dashboard-header">
-          <h1 className="heading-2">Hi {user.name}!</h1>
-          <p className="body-medium">{today}</p>
+          <div className="user-greeting">
+            <h1 className="heading-2">Hi {user.name}!</h1>
+            <p className="body-medium">{today}</p>
+          </div>
+          <div className="gamification-summary">
+            <div className="points-display">
+              <span className="points-number">{userStats.total_points}</span>
+              <span className="points-label">points</span>
+            </div>
+            <div className="streak-display">
+              <span className="streak-icon">🔥</span>
+              <span className="streak-number">{userStats.current_streak}</span>
+            </div>
+          </div>
         </header>
 
         <div className="stats-grid">
@@ -271,6 +346,9 @@ function App() {
             <div className="progress-bar">
               <div className="progress-fill" style={{width: `${Math.min(calorieProgress, 100)}%`}}></div>
             </div>
+            {dailyStats.points_earned_today > 0 && (
+              <div className="points-earned">+{dailyStats.points_earned_today} pts today</div>
+            )}
           </div>
 
           <div className="stat-card">
@@ -294,7 +372,36 @@ function App() {
           <div className="macro-item">
             <span className="body-medium">Fat: {Math.round(dailyStats.total_fat)}g</span>
           </div>
+          <div className="macro-item">
+            <span className="body-medium">Target: {Math.round(dailyStats.target_hit_percentage)}%</span>
+          </div>
         </div>
+
+        {/* Achievement Badges Display */}
+        {userStats.badges_earned.length > 0 && (
+          <div className="badges-preview">
+            <h3 className="heading-4">Recent Badges</h3>
+            <div className="badges-list">
+              {userStats.badges_earned.slice(0, 3).map((badgeKey, idx) => {
+                const badge = badges[badgeKey];
+                return badge ? (
+                  <div key={idx} className="badge-item">
+                    <span className="badge-icon">{badge.icon}</span>
+                    <span className="badge-name">{badge.name}</span>
+                  </div>
+                ) : null;
+              })}
+              {userStats.badges_earned.length > 3 && (
+                <button 
+                  className="view-all-badges" 
+                  onClick={() => setCurrentView('achievements')}
+                >
+                  +{userStats.badges_earned.length - 3} more
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="action-buttons">
           <button className="btn-primary" onClick={() => setCurrentView('camera')}>
@@ -313,7 +420,12 @@ function App() {
                 <div key={log.log_id} className="meal-card">
                   <div className="meal-header">
                     <span className="meal-type">{log.meal_type}</span>
-                    <span className="meal-calories">{log.total_calories} cal</span>
+                    <div className="meal-meta">
+                      <span className="meal-calories">{log.total_calories} cal</span>
+                      {log.points_earned > 0 && (
+                        <span className="meal-points">+{log.points_earned} pts</span>
+                      )}
+                    </div>
                   </div>
                   <div className="meal-foods">
                     {log.food_items.map((food, idx) => (
@@ -324,7 +436,7 @@ function App() {
               ))}
             </div>
           ) : (
-            <p className="body-medium">No meals logged today</p>
+            <p className="body-medium">No meals logged today. Start by scanning your first meal!</p>
           )}
         </div>
 
@@ -436,10 +548,32 @@ function App() {
       <header className="profile-header">
         <button className="back-button" onClick={() => setCurrentView('dashboard')}>← Back</button>
         <h2 className="heading-3">Your Progress</h2>
+        <button className="achievements-button" onClick={() => setCurrentView('achievements')}>
+          🏆 Badges
+        </button>
       </header>
 
-      {user && (
+      {user && userStats && (
         <div className="profile-content">
+          <div className="stats-overview">
+            <div className="stat-item">
+              <span className="stat-number">{userStats.total_points}</span>
+              <span className="stat-label">Total Points</span>
+            </div>
+            <div className="stat-item">
+              <span className="stat-number">{userStats.current_streak}</span>
+              <span className="stat-label">Current Streak</span>
+            </div>
+            <div className="stat-item">
+              <span className="stat-number">{userStats.longest_streak}</span>
+              <span className="stat-label">Best Streak</span>
+            </div>
+            <div className="stat-item">
+              <span className="stat-number">{userStats.badges_earned.length}</span>
+              <span className="stat-label">Badges</span>
+            </div>
+          </div>
+
           <div className="profile-stats">
             <h3 className="heading-4">Your Goals</h3>
             <div className="goal-item">
@@ -453,6 +587,14 @@ function App() {
             <div className="goal-item">
               <span className="label">Weekly Gain:</span>
               <span className="value">{user.target_weekly_gain} kg</span>
+            </div>
+            <div className="goal-item">
+              <span className="label">Avg Daily Calories:</span>
+              <span className="value">{userStats.avg_daily_calories}</span>
+            </div>
+            <div className="goal-item">
+              <span className="label">Goal Hit Rate:</span>
+              <span className="value">{userStats.goal_completion_rate}%</span>
             </div>
           </div>
 
@@ -495,12 +637,71 @@ function App() {
     </div>
   );
 
+  const renderAchievements = () => (
+    <div className="achievements-container">
+      <header className="achievements-header">
+        <button className="back-button" onClick={() => setCurrentView('profile')}>← Back</button>
+        <h2 className="heading-3">Your Achievements</h2>
+      </header>
+
+      <div className="achievements-content">
+        <div className="earned-badges">
+          <h3 className="heading-4">Badges Earned ({userStats?.badges_earned.length || 0})</h3>
+          <div className="badges-grid">
+            {userStats?.badges_earned.map((badgeKey, idx) => {
+              const badge = badges[badgeKey];
+              const achievement = achievements.find(a => a.badge_type === badgeKey);
+              return badge ? (
+                <div key={idx} className="badge-card earned">
+                  <div className="badge-icon">{badge.icon}</div>
+                  <div className="badge-info">
+                    <h4 className="badge-name">{badge.name}</h4>
+                    <p className="badge-description">{badge.description}</p>
+                    <div className="badge-points">+{badge.points} points</div>
+                    {achievement && (
+                      <div className="badge-date">
+                        Earned: {new Date(achievement.earned_date).toLocaleDateString()}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : null;
+            })}
+          </div>
+        </div>
+
+        <div className="available-badges">
+          <h3 className="heading-4">Available Badges</h3>
+          <div className="badges-grid">
+            {Object.entries(badges).map(([badgeKey, badge]) => {
+              const isEarned = userStats?.badges_earned.includes(badgeKey);
+              if (isEarned) return null;
+              
+              return (
+                <div key={badgeKey} className="badge-card available">
+                  <div className="badge-icon grayscale">{badge.icon}</div>
+                  <div className="badge-info">
+                    <h4 className="badge-name">{badge.name}</h4>
+                    <p className="badge-description">{badge.description}</p>
+                    <div className="badge-points">+{badge.points} points</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="App">
+      {renderNotification()}
       {currentView === 'onboarding' && renderOnboarding()}
       {currentView === 'dashboard' && renderDashboard()}
       {currentView === 'camera' && renderCamera()}
       {currentView === 'profile' && renderProfile()}
+      {currentView === 'achievements' && renderAchievements()}
     </div>
   );
 }

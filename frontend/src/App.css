@@ -24,6 +24,13 @@
   /* Gradients */
   --gradient-hero: linear-gradient(135deg, rgba(243, 234, 255, 0.8) 0%, rgba(255, 232, 240, 0.8) 25%, rgba(232, 244, 255, 0.8) 50%, rgba(255, 232, 213, 0.8) 75%, rgba(243, 234, 255, 0.8) 100%);
   --gradient-button: linear-gradient(168deg, rgb(67, 67, 67) -63%, rgb(0, 0, 0) 100%);
+  
+  /* Gamification Colors */
+  --color-success: #10B981;
+  --color-warning: #F59E0B;
+  --color-error: #EF4444;
+  --color-points: #8B5CF6;
+  --color-streak: #F97316;
 }
 
 * {
@@ -44,6 +51,48 @@ body {
 .App {
   min-height: 100vh;
   width: 100%;
+  position: relative;
+}
+
+/* Notifications */
+.notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+  background: var(--color-success);
+  color: white;
+  padding: 16px 20px;
+  border-radius: 8px;
+  box-shadow: 0px 4px 16px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 400px;
+  animation: slideIn 0.3s ease;
+}
+
+.notification.error {
+  background: var(--color-error);
+}
+
+.notification button {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
 }
 
 /* Typography */
@@ -242,8 +291,62 @@ body {
 }
 
 .dashboard-header {
-  text-align: center;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
   margin-bottom: 32px;
+}
+
+.user-greeting {
+  text-align: left;
+}
+
+.gamification-summary {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.points-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: var(--bg-section);
+  padding: 12px 16px;
+  border-radius: 8px;
+}
+
+.points-number {
+  font-family: 'Satoshi';
+  font-weight: 700;
+  font-size: 20px;
+  color: var(--color-points);
+  line-height: 1;
+}
+
+.points-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.streak-display {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-section);
+  padding: 12px 16px;
+  border-radius: 8px;
+}
+
+.streak-icon {
+  font-size: 18px;
+}
+
+.streak-number {
+  font-family: 'Satoshi';
+  font-weight: 700;
+  font-size: 18px;
+  color: var(--color-streak);
 }
 
 .stats-grid {
@@ -259,6 +362,7 @@ body {
   border-radius: 12px;
   padding: 24px;
   text-align: center;
+  position: relative;
 }
 
 .progress-circle {
@@ -286,6 +390,18 @@ body {
   transition: width 0.3s ease;
 }
 
+.points-earned {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: var(--color-points);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .macro-summary {
   display: flex;
   justify-content: space-around;
@@ -298,6 +414,55 @@ body {
 
 .macro-item {
   text-align: center;
+}
+
+/* Badges Preview */
+.badges-preview {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.badges-list {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 16px;
+}
+
+.badge-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-section);
+  padding: 8px 12px;
+  border-radius: 8px;
+}
+
+.badge-icon {
+  font-size: 18px;
+}
+
+.badge-name {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.view-all-badges {
+  background: var(--brand-primary);
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.view-all-badges:hover {
+  background: var(--brand-hover);
 }
 
 .action-buttons {
@@ -340,9 +505,24 @@ body {
   color: var(--text-primary);
 }
 
+.meal-meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 .meal-calories {
   font-weight: 500;
   color: var(--text-secondary);
+}
+
+.meal-points {
+  background: var(--color-points);
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .meal-foods {
@@ -547,14 +727,59 @@ body {
 .profile-header {
   display: flex;
   align-items: center;
-  gap: 16px;
+  justify-content: space-between;
   margin-bottom: 32px;
+}
+
+.achievements-button {
+  background: var(--brand-primary);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.achievements-button:hover {
+  background: var(--brand-hover);
 }
 
 .profile-content {
   display: flex;
   flex-direction: column;
   gap: 32px;
+}
+
+.stats-overview {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.stat-item {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  padding: 16px;
+  text-align: center;
+}
+
+.stat-number {
+  display: block;
+  font-family: 'Satoshi';
+  font-weight: 700;
+  font-size: 24px;
+  color: var(--brand-primary);
+  line-height: 1;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 4px;
 }
 
 .profile-stats {
@@ -610,6 +835,110 @@ body {
   font-size: 16px;
 }
 
+/* Achievements */
+.achievements-container {
+  padding: 24px;
+  max-width: 800px;
+  margin: 0 auto;
+  min-height: 100vh;
+}
+
+.achievements-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.achievements-content {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.badges-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.badge-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  transition: all 0.2s ease;
+}
+
+.badge-card.earned {
+  border-color: var(--color-success);
+  background: rgba(16, 185, 129, 0.05);
+}
+
+.badge-card.available {
+  opacity: 0.7;
+}
+
+.badge-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0px 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+.badge-card .badge-icon {
+  font-size: 32px;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-section);
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.badge-card .badge-icon.grayscale {
+  filter: grayscale(100%);
+}
+
+.badge-info {
+  flex: 1;
+}
+
+.badge-card .badge-name {
+  font-family: 'Satoshi';
+  font-weight: 600;
+  font-size: 16px;
+  margin-bottom: 4px;
+  color: var(--text-primary);
+}
+
+.badge-card .badge-description {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.badge-points {
+  background: var(--color-points);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-block;
+}
+
+.badge-date {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
 /* Utilities */
 .loading {
   text-align: center;
@@ -649,6 +978,26 @@ body {
     grid-template-columns: 1fr;
   }
   
+  .stats-overview {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .badges-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .gamification-summary {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .dashboard-header {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 16px;
+  }
+  
   .btn-primary,
   .btn-secondary {
     width: 100%;
@@ -659,7 +1008,8 @@ body {
 @media (min-width: 810px) and (max-width: 1199px) {
   .dashboard-container,
   .camera-container,
-  .profile-container {
+  .profile-container,
+  .achievements-container {
     max-width: 700px;
   }
 }
@@ -667,6 +1017,10 @@ body {
 @media (min-width: 1200px) {
   .stats-grid {
     grid-template-columns: repeat(3, 1fr);
+  }
+  
+  .badges-grid {
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   }
   
   .stat-card:hover {
