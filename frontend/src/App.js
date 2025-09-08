@@ -4,7 +4,7 @@ import './App.css';
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
 
 function App() {
-  const [currentView, setCurrentView] = useState('onboarding'); // onboarding, dashboard, camera, profile, achievements, coaching
+  const [currentView, setCurrentView] = useState('onboarding'); // onboarding, dashboard, camera, profile, achievements, coaching, challenges
   const [user, setUser] = useState(null);
   const [dailyStats, setDailyStats] = useState(null);
   const [userStats, setUserStats] = useState(null);
@@ -14,9 +14,12 @@ function App() {
   const [badges, setBadges] = useState({});
   const [coachingTips, setCoachingTips] = useState([]);
   const [mealSuggestions, setMealSuggestions] = useState([]);
+  const [activeChallenges, setActiveChallenges] = useState([]);
+  const [completedChallenges, setCompletedChallenges] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [notification, setNotification] = useState('');
+  const [celebration, setCelebration] = useState(null);
   
   // Camera states
   const [cameraMode, setCameraMode] = useState(false);
@@ -65,6 +68,10 @@ function App() {
         if (stats.coaching_tips) {
           setCoachingTips(stats.coaching_tips);
         }
+        // Extract challenge data
+        if (stats.active_challenges) {
+          setActiveChallenges(stats.active_challenges);
+        }
       }
 
       // Load user stats
@@ -108,6 +115,20 @@ function App() {
         const suggestionsData = await suggestionsResponse.json();
         setMealSuggestions(suggestionsData.suggestions || []);
       }
+
+      // Load active challenges
+      const challengesResponse = await fetch(`${BACKEND_URL}/api/challenges/active/${userId}`);
+      if (challengesResponse.ok) {
+        const challengesData = await challengesResponse.json();
+        setActiveChallenges(challengesData);
+      }
+
+      // Load completed challenges
+      const completedResponse = await fetch(`${BACKEND_URL}/api/challenges/completed/${userId}`);
+      if (completedResponse.ok) {
+        const completedData = await completedResponse.json();
+        setCompletedChallenges(completedData);
+      }
     } catch (error) {
       console.error('Error loading dashboard data:', error);
     }
@@ -115,7 +136,12 @@ function App() {
 
   const showNotification = (message, type = 'success') => {
     setNotification({ message, type });
-    setTimeout(() => setNotification(''), 4000);
+    setTimeout(() => setNotification(''), 5000);
+  };
+
+  const showCelebration = (type, data) => {
+    setCelebration({ type, data });
+    setTimeout(() => setCelebration(null), 4000);
   };
 
   const markTipAsRead = async (tipId) => {
@@ -149,6 +175,25 @@ function App() {
     }
   };
 
+  const createRandomChallenges = async () => {
+    if (!user) return;
+    
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/challenges/create-random/${user.user_id}`, {
+        method: 'POST'
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        showNotification(`${result.challenges_created} new challenges created! 🎯`);
+        showCelebration('challenges', { count: result.challenges_created });
+        await loadDashboardData(user.user_id);
+      }
+    } catch (error) {
+      console.error('Error creating challenges:', error);
+    }
+  };
+
   const handleOnboarding = async (formData) => {
     setLoading(true);
     setError('');
@@ -166,7 +211,8 @@ function App() {
         localStorage.setItem('weightGainUser', JSON.stringify(result.user));
         setCurrentView('dashboard');
         await loadDashboardData(result.user.user_id);
-        showNotification('Welcome! Your profile has been created successfully! 🎉');
+        showNotification('Welcome to your weight gain journey! 🎉');
+        showCelebration('welcome', { name: formData.name });
       } else {
         throw new Error('Failed to create user profile');
       }
@@ -253,6 +299,7 @@ function App() {
       if (analyzeResponse.ok) {
         const result = await analyzeResponse.json();
         setNutritionData(result.nutrition_data);
+        showCelebration('analysis', { calories: result.nutrition_data.total_calories });
       } else {
         throw new Error('Failed to analyze food image');
       }
@@ -289,6 +336,11 @@ function App() {
         let message = `Food logged successfully! +${result.points_earned} points`;
         if (result.new_badges.length > 0) {
           message += ` • New badges earned! 🏆`;
+          showCelebration('badges', { badges: result.new_badges, points: result.badge_points });
+        }
+        if (result.completed_challenges && result.completed_challenges.length > 0) {
+          message += ` • Challenge completed! 🎯`;
+          showCelebration('challenge_complete', { challenges: result.completed_challenges });
         }
         if (result.current_streak > 1) {
           message += ` • ${result.current_streak} day streak! 🔥`;
@@ -329,6 +381,7 @@ function App() {
       if (response.ok) {
         const result = await response.json();
         showNotification(`Weight logged! +${result.points_earned} points 📊`);
+        showCelebration('weight', { weight: parseFloat(weight) });
         await loadDashboardData(user.user_id);
       }
     } catch (error) {
@@ -340,54 +393,147 @@ function App() {
     if (!notification) return null;
     
     return (
-      <div className={`notification ${notification.type}`}>
+      <div className={`notification ${notification.type} slide-in`}>
         <span>{notification.message}</span>
         <button onClick={() => setNotification('')}>×</button>
       </div>
     );
   };
 
+  const renderCelebration = () => {
+    if (!celebration) return null;
+    
+    return (
+      <div className="celebration-overlay">
+        <div className="celebration-content">
+          {celebration.type === 'welcome' && (
+            <>
+              <div className="celebration-icon">🎉</div>
+              <h2>Welcome, {celebration.data.name}!</h2>
+              <p>Your weight gain journey starts now!</p>
+            </>
+          )}
+          {celebration.type === 'badges' && (
+            <>
+              <div className="celebration-icon animate-bounce">🏆</div>
+              <h2>Badge Earned!</h2>
+              <p>+{celebration.data.points} bonus points!</p>
+            </>
+          )}
+          {celebration.type === 'challenge_complete' && (
+            <>
+              <div className="celebration-icon animate-pulse">🎯</div>
+              <h2>Challenge Complete!</h2>
+              <p>Amazing work! Keep it up!</p>
+            </>
+          )}
+          {celebration.type === 'challenges' && (
+            <>
+              <div className="celebration-icon animate-spin-slow">⚡</div>
+              <h2>New Challenges!</h2>
+              <p>{celebration.data.count} challenges ready for you!</p>
+            </>
+          )}
+          {celebration.type === 'analysis' && (
+            <>
+              <div className="celebration-icon animate-pulse">🔍</div>
+              <h2>Food Analyzed!</h2>
+              <p>{celebration.data.calories} calories detected!</p>
+            </>
+          )}
+          {celebration.type === 'weight' && (
+            <>
+              <div className="celebration-icon animate-bounce">⚖️</div>
+              <h2>Weight Logged!</h2>
+              <p>{celebration.data.weight}kg recorded!</p>
+            </>
+          )}
+        </div>
+        <div className="celebration-particles">
+          {[...Array(12)].map((_, i) => (
+            <div key={i} className={`particle particle-${i + 1}`}>✨</div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   const renderOnboarding = () => (
     <div className="onboarding-container">
-      <div className="onboarding-card">
+      <div className="onboarding-card fade-in">
         <h1 className="heading-1">Welcome to Weight Gain Tracker</h1>
         <p className="body-large">Let's set up your profile to calculate your personalized calorie targets</p>
         
         <OnboardingForm onSubmit={handleOnboarding} loading={loading} />
         
-        {error && <div className="error-message">{error}</div>}
+        {error && <div className="error-message shake">{error}</div>}
       </div>
     </div>
   );
 
   const renderDashboard = () => {
-    if (!user || !dailyStats || !userStats) return <div className="loading">Loading dashboard...</div>;
+    if (!user || !dailyStats || !userStats) return <div className="loading pulse">Loading dashboard...</div>;
 
     const calorieProgress = (dailyStats.total_calories / dailyStats.calorie_target) * 100;
     const proteinProgress = (dailyStats.total_protein / dailyStats.protein_target) * 100;
 
     return (
       <div className="dashboard-container">
-        <header className="dashboard-header">
+        <header className="dashboard-header fade-in">
           <div className="user-greeting">
-            <h1 className="heading-2">Hi {user.name}!</h1>
+            <h1 className="heading-2">Hi {user.name}! 👋</h1>
             <p className="body-medium">{today}</p>
           </div>
           <div className="gamification-summary">
-            <div className="points-display">
+            <div className="points-display animate-count">
               <span className="points-number">{userStats.total_points}</span>
               <span className="points-label">points</span>
             </div>
             <div className="streak-display">
-              <span className="streak-icon">🔥</span>
+              <span className="streak-icon animate-flicker">🔥</span>
               <span className="streak-number">{userStats.current_streak}</span>
             </div>
           </div>
         </header>
 
+        {/* Active Challenges Preview */}
+        {activeChallenges.length > 0 && (
+          <div className="challenges-preview slide-in">
+            <div className="challenges-header">
+              <h3 className="heading-4">🎯 Active Challenges</h3>
+              <button className="view-all-btn" onClick={() => setCurrentView('challenges')}>
+                View All ({activeChallenges.length})
+              </button>
+            </div>
+            <div className="challenges-list">
+              {activeChallenges.slice(0, 2).map(challenge => (
+                <div key={challenge.challenge_id} className="challenge-card mini">
+                  <div className="challenge-info">
+                    <span className="challenge-title">{challenge.title}</span>
+                    <div className="challenge-progress">
+                      <div className="progress-bar">
+                        <div 
+                          className="progress-fill animate-width" 
+                          style={{width: `${Math.min(challenge.progress_percentage, 100)}%`}}
+                        ></div>
+                      </div>
+                      <span className="progress-text">
+                        {challenge.current_progress}/{challenge.goal_value} {challenge.goal_unit}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="challenge-reward">
+                    +{challenge.points_reward} pts
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Coaching Tips Section */}
         {coachingTips.length > 0 && (
-          <div className="coaching-tips-section">
+          <div className="coaching-tips-section slide-in">
             <div className="coaching-header">
               <h3 className="heading-4">🤖 Smart Coach</h3>
               <button className="coach-more-btn" onClick={() => setCurrentView('coaching')}>
@@ -396,11 +542,11 @@ function App() {
             </div>
             <div className="tips-preview">
               {coachingTips.slice(0, 2).map(tip => (
-                <div key={tip.tip_id} className={`coaching-tip-card ${tip.priority}`}>
+                <div key={tip.tip_id} className={`coaching-tip-card ${tip.priority} slide-in-up`}>
                   <div className="tip-header">
                     <span className="tip-title">{tip.title}</span>
                     <button 
-                      className="tip-close"
+                      className="tip-close hover-scale"
                       onClick={() => markTipAsRead(tip.tip_id)}
                     >×</button>
                   </div>
@@ -412,37 +558,43 @@ function App() {
         )}
 
         <div className="stats-grid">
-          <div className="stat-card">
+          <div className="stat-card hover-lift">
             <h3 className="heading-4">Calories</h3>
             <div className="progress-circle">
               <div className="progress-text">
-                <span className="heading-3">{dailyStats.total_calories}</span>
+                <span className="heading-3 animate-count">{dailyStats.total_calories}</span>
                 <span className="body-small">/ {dailyStats.calorie_target}</span>
               </div>
             </div>
             <div className="progress-bar">
-              <div className="progress-fill" style={{width: `${Math.min(calorieProgress, 100)}%`}}></div>
+              <div 
+                className="progress-fill animate-width" 
+                style={{width: `${Math.min(calorieProgress, 100)}%`}}
+              ></div>
             </div>
             {dailyStats.points_earned_today > 0 && (
-              <div className="points-earned">+{dailyStats.points_earned_today} pts today</div>
+              <div className="points-earned animate-bounce">+{dailyStats.points_earned_today} pts today</div>
             )}
           </div>
 
-          <div className="stat-card">
+          <div className="stat-card hover-lift">
             <h3 className="heading-4">Protein</h3>
             <div className="progress-circle">
               <div className="progress-text">
-                <span className="heading-3">{Math.round(dailyStats.total_protein)}g</span>
+                <span className="heading-3 animate-count">{Math.round(dailyStats.total_protein)}g</span>
                 <span className="body-small">/ {dailyStats.protein_target}g</span>
               </div>
             </div>
             <div className="progress-bar">
-              <div className="progress-fill" style={{width: `${Math.min(proteinProgress, 100)}%`}}></div>
+              <div 
+                className="progress-fill animate-width" 
+                style={{width: `${Math.min(proteinProgress, 100)}%`}}
+              ></div>
             </div>
           </div>
         </div>
 
-        <div className="macro-summary">
+        <div className="macro-summary slide-in">
           <div className="macro-item">
             <span className="body-medium">Carbs: {Math.round(dailyStats.total_carbs)}g</span>
           </div>
@@ -456,13 +608,13 @@ function App() {
 
         {/* Achievement Badges Display */}
         {userStats.badges_earned.length > 0 && (
-          <div className="badges-preview">
+          <div className="badges-preview slide-in">
             <h3 className="heading-4">Recent Badges</h3>
             <div className="badges-list">
               {userStats.badges_earned.slice(0, 3).map((badgeKey, idx) => {
                 const badge = badges[badgeKey];
                 return badge ? (
-                  <div key={idx} className="badge-item">
+                  <div key={idx} className="badge-item hover-scale">
                     <span className="badge-icon">{badge.icon}</span>
                     <span className="badge-name">{badge.name}</span>
                   </div>
@@ -470,7 +622,7 @@ function App() {
               })}
               {userStats.badges_earned.length > 3 && (
                 <button 
-                  className="view-all-badges" 
+                  className="view-all-badges hover-scale" 
                   onClick={() => setCurrentView('achievements')}
                 >
                   +{userStats.badges_earned.length - 3} more
@@ -481,26 +633,26 @@ function App() {
         )}
 
         <div className="action-buttons">
-          <button className="btn-primary" onClick={() => setCurrentView('camera')}>
+          <button className="btn-primary hover-scale" onClick={() => setCurrentView('camera')}>
             📷 Scan Food
           </button>
-          <button className="btn-secondary" onClick={() => setCurrentView('coaching')}>
-            🤖 Smart Coach
+          <button className="btn-secondary hover-scale" onClick={() => setCurrentView('challenges')}>
+            🎯 Challenges
           </button>
         </div>
 
-        <div className="recent-meals">
+        <div className="recent-meals slide-in">
           <h3 className="heading-4">Today's Meals</h3>
           {foodLogs.length > 0 ? (
             <div className="meals-list">
-              {foodLogs.map(log => (
-                <div key={log.log_id} className="meal-card">
+              {foodLogs.map((log, idx) => (
+                <div key={log.log_id} className={`meal-card slide-in-up`} style={{animationDelay: `${idx * 0.1}s`}}>
                   <div className="meal-header">
                     <span className="meal-type">{log.meal_type}</span>
                     <div className="meal-meta">
                       <span className="meal-calories">{log.total_calories} cal</span>
                       {log.points_earned > 0 && (
-                        <span className="meal-points">+{log.points_earned} pts</span>
+                        <span className="meal-points animate-pulse">+{log.points_earned} pts</span>
                       )}
                     </div>
                   </div>
@@ -513,26 +665,29 @@ function App() {
               ))}
             </div>
           ) : (
-            <p className="body-medium">No meals logged today. Start by scanning your first meal!</p>
+            <div className="no-meals">
+              <p className="body-medium">No meals logged today.</p>
+              <p className="body-small">Start by scanning your first meal to earn points and complete challenges!</p>
+            </div>
           )}
         </div>
 
-        {error && <div className="error-message">{error}</div>}
+        {error && <div className="error-message shake">{error}</div>}
       </div>
     );
   };
 
   const renderCamera = () => (
     <div className="camera-container">
-      <header className="camera-header">
-        <button className="back-button" onClick={() => setCurrentView('dashboard')}>← Back</button>
+      <header className="camera-header fade-in">
+        <button className="back-button hover-scale" onClick={() => setCurrentView('dashboard')}>← Back</button>
         <h2 className="heading-3">Scan Your Food</h2>
       </header>
 
       {!cameraMode && !capturedImage && (
         <div className="camera-options">
-          <button className="btn-primary" onClick={startCamera}>📷 Use Camera</button>
-          <button className="btn-secondary" onClick={() => fileInputRef.current?.click()}>
+          <button className="btn-primary hover-scale" onClick={startCamera}>📷 Use Camera</button>
+          <button className="btn-secondary hover-scale" onClick={() => fileInputRef.current?.click()}>
             📁 Upload Photo
           </button>
           <input
@@ -546,7 +701,7 @@ function App() {
       )}
 
       {cameraMode && (
-        <div className="camera-view">
+        <div className="camera-view fade-in">
           <video
             ref={videoRef}
             autoPlay
@@ -555,24 +710,24 @@ function App() {
           />
           <canvas ref={canvasRef} style={{ display: 'none' }} />
           <div className="camera-controls">
-            <button className="capture-button" onClick={capturePhoto}>📷</button>
+            <button className="capture-button pulse" onClick={capturePhoto}>📷</button>
             <button className="btn-secondary" onClick={stopCamera}>Cancel</button>
           </div>
         </div>
       )}
 
       {capturedImage && !nutritionData && (
-        <div className="image-preview">
+        <div className="image-preview fade-in">
           <img src={capturedImage} alt="Captured food" className="captured-image" />
           <div className="image-actions">
             <button 
-              className="btn-primary" 
+              className={`btn-primary ${analyzing ? 'pulse' : 'hover-scale'}`}
               onClick={analyzeFood}
               disabled={analyzing}
             >
-              {analyzing ? 'Analyzing...' : '🔍 Analyze Food'}
+              {analyzing ? '🔍 Analyzing...' : '🔍 Analyze Food'}
             </button>
-            <button className="btn-secondary" onClick={() => setCapturedImage(null)}>
+            <button className="btn-secondary hover-scale" onClick={() => setCapturedImage(null)}>
               Retake
             </button>
           </div>
@@ -580,11 +735,11 @@ function App() {
       )}
 
       {nutritionData && (
-        <div className="nutrition-results">
+        <div className="nutrition-results slide-in">
           <h3 className="heading-4">Nutrition Analysis</h3>
           <div className="nutrition-summary">
             <div className="nutrition-total">
-              <span className="heading-3">{nutritionData.total_calories}</span>
+              <span className="heading-3 animate-count">{nutritionData.total_calories}</span>
               <span className="body-medium">calories</span>
             </div>
             <div className="nutrition-macros">
@@ -596,7 +751,7 @@ function App() {
 
           <div className="food-items">
             {nutritionData.foods.map((food, idx) => (
-              <div key={idx} className="food-item">
+              <div key={idx} className={`food-item slide-in-up`} style={{animationDelay: `${idx * 0.1}s`}}>
                 <div className="food-name">{food.name}</div>
                 <div className="food-portion">{food.portion_size}</div>
                 <div className="food-calories">{food.calories} cal</div>
@@ -607,51 +762,51 @@ function App() {
           <div className="meal-type-selector">
             <h4 className="heading-4">Add to:</h4>
             <div className="meal-buttons">
-              <button className="meal-btn" onClick={() => saveFoodLog('breakfast')}>Breakfast</button>
-              <button className="meal-btn" onClick={() => saveFoodLog('lunch')}>Lunch</button>
-              <button className="meal-btn" onClick={() => saveFoodLog('dinner')}>Dinner</button>
-              <button className="meal-btn" onClick={() => saveFoodLog('snack')}>Snack</button>
+              <button className="meal-btn hover-scale" onClick={() => saveFoodLog('breakfast')}>Breakfast</button>
+              <button className="meal-btn hover-scale" onClick={() => saveFoodLog('lunch')}>Lunch</button>
+              <button className="meal-btn hover-scale" onClick={() => saveFoodLog('dinner')}>Dinner</button>
+              <button className="meal-btn hover-scale" onClick={() => saveFoodLog('snack')}>Snack</button>
             </div>
           </div>
         </div>
       )}
 
-      {error && <div className="error-message">{error}</div>}
+      {error && <div className="error-message shake">{error}</div>}
     </div>
   );
 
   const renderProfile = () => (
     <div className="profile-container">
-      <header className="profile-header">
-        <button className="back-button" onClick={() => setCurrentView('dashboard')}>← Back</button>
+      <header className="profile-header fade-in">
+        <button className="back-button hover-scale" onClick={() => setCurrentView('dashboard')}>← Back</button>
         <h2 className="heading-3">Your Progress</h2>
-        <button className="achievements-button" onClick={() => setCurrentView('achievements')}>
+        <button className="achievements-button hover-scale" onClick={() => setCurrentView('achievements')}>
           🏆 Badges
         </button>
       </header>
 
       {user && userStats && (
         <div className="profile-content">
-          <div className="stats-overview">
-            <div className="stat-item">
-              <span className="stat-number">{userStats.total_points}</span>
+          <div className="stats-overview slide-in">
+            <div className="stat-item hover-lift">
+              <span className="stat-number animate-count">{userStats.total_points}</span>
               <span className="stat-label">Total Points</span>
             </div>
-            <div className="stat-item">
-              <span className="stat-number">{userStats.current_streak}</span>
+            <div className="stat-item hover-lift">
+              <span className="stat-number animate-count">{userStats.current_streak}</span>
               <span className="stat-label">Current Streak</span>
             </div>
-            <div className="stat-item">
-              <span className="stat-number">{userStats.longest_streak}</span>
+            <div className="stat-item hover-lift">
+              <span className="stat-number animate-count">{userStats.longest_streak}</span>
               <span className="stat-label">Best Streak</span>
             </div>
-            <div className="stat-item">
-              <span className="stat-number">{userStats.badges_earned.length}</span>
+            <div className="stat-item hover-lift">
+              <span className="stat-number animate-count">{userStats.badges_earned.length}</span>
               <span className="stat-label">Badges</span>
             </div>
           </div>
 
-          <div className="profile-stats">
+          <div className="profile-stats slide-in">
             <h3 className="heading-4">Your Goals</h3>
             <div className="goal-item">
               <span className="label">Daily Calories:</span>
@@ -673,13 +828,17 @@ function App() {
               <span className="label">Goal Hit Rate:</span>
               <span className="value">{userStats.goal_completion_rate}%</span>
             </div>
+            <div className="goal-item">
+              <span className="label">Challenge Points:</span>
+              <span className="value">{userStats.challenge_points}</span>
+            </div>
           </div>
 
-          <div className="weight-tracker">
+          <div className="weight-tracker slide-in">
             <h3 className="heading-4">Weight Progress</h3>
             {weightEntries.length > 0 && (
               <div className="current-weight">
-                <span className="heading-2">{weightEntries[0].weight_kg} kg</span>
+                <span className="heading-2 animate-count">{weightEntries[0].weight_kg} kg</span>
                 <span className="body-medium">Current Weight</span>
               </div>
             )}
@@ -700,7 +859,7 @@ function App() {
           </div>
 
           <button 
-            className="btn-secondary" 
+            className="btn-secondary hover-scale" 
             onClick={() => {
               localStorage.removeItem('weightGainUser');
               setUser(null);
@@ -716,8 +875,8 @@ function App() {
 
   const renderAchievements = () => (
     <div className="achievements-container">
-      <header className="achievements-header">
-        <button className="back-button" onClick={() => setCurrentView('profile')}>← Back</button>
+      <header className="achievements-header fade-in">
+        <button className="back-button hover-scale" onClick={() => setCurrentView('profile')}>← Back</button>
         <h2 className="heading-3">Your Achievements</h2>
       </header>
 
@@ -729,8 +888,8 @@ function App() {
               const badge = badges[badgeKey];
               const achievement = achievements.find(a => a.badge_type === badgeKey);
               return badge ? (
-                <div key={idx} className="badge-card earned">
-                  <div className="badge-icon">{badge.icon}</div>
+                <div key={idx} className={`badge-card earned slide-in-up`} style={{animationDelay: `${idx * 0.1}s`}}>
+                  <div className="badge-icon animate-bounce">{badge.icon}</div>
                   <div className="badge-info">
                     <h4 className="badge-name">{badge.name}</h4>
                     <p className="badge-description">{badge.description}</p>
@@ -750,13 +909,13 @@ function App() {
         <div className="available-badges">
           <h3 className="heading-4">Available Badges</h3>
           <div className="badges-grid">
-            {Object.entries(badges).map(([badgeKey, badge]) => {
+            {Object.entries(badges).map(([badgeKey, badge], idx) => {
               const isEarned = userStats?.badges_earned.includes(badgeKey);
               if (isEarned) return null;
               
               return (
-                <div key={badgeKey} className="badge-card available">
-                  <div className="badge-icon grayscale">{badge.icon}</div>
+                <div key={badgeKey} className={`badge-card available slide-in-up`} style={{animationDelay: `${idx * 0.1}s`}}>
+                  <div className="badge-icon grayscale hover-ungrayscale">{badge.icon}</div>
                   <div className="badge-info">
                     <h4 className="badge-name">{badge.name}</h4>
                     <p className="badge-description">{badge.description}</p>
@@ -773,10 +932,10 @@ function App() {
 
   const renderCoaching = () => (
     <div className="coaching-container">
-      <header className="coaching-header">
-        <button className="back-button" onClick={() => setCurrentView('dashboard')}>← Back</button>
+      <header className="coaching-header fade-in">
+        <button className="back-button hover-scale" onClick={() => setCurrentView('dashboard')}>← Back</button>
         <h2 className="heading-3">🤖 Smart Coach</h2>
-        <button className="generate-tips-btn" onClick={generateTips}>
+        <button className="generate-tips-btn hover-scale" onClick={generateTips}>
           Generate Tips
         </button>
       </header>
@@ -787,15 +946,15 @@ function App() {
           <h3 className="heading-4">Active Tips ({coachingTips.length})</h3>
           {coachingTips.length > 0 ? (
             <div className="tips-list">
-              {coachingTips.map(tip => (
-                <div key={tip.tip_id} className={`coaching-tip-card full ${tip.priority}`}>
+              {coachingTips.map((tip, idx) => (
+                <div key={tip.tip_id} className={`coaching-tip-card full ${tip.priority} slide-in-up`} style={{animationDelay: `${idx * 0.1}s`}}>
                   <div className="tip-header">
                     <div className="tip-meta">
                       <span className="tip-type">{tip.tip_type.replace('_', ' ')}</span>
                       <span className={`tip-priority ${tip.priority}`}>{tip.priority}</span>
                     </div>
                     <button 
-                      className="tip-close"
+                      className="tip-close hover-scale"
                       onClick={() => markTipAsRead(tip.tip_id)}
                     >×</button>
                   </div>
@@ -810,7 +969,7 @@ function App() {
           ) : (
             <div className="no-tips">
               <p className="body-medium">No active tips right now.</p>
-              <button className="btn-secondary" onClick={generateTips}>
+              <button className="btn-secondary hover-scale" onClick={generateTips}>
                 Get Personalized Tips
               </button>
             </div>
@@ -819,11 +978,11 @@ function App() {
 
         {/* Meal Suggestions */}
         {mealSuggestions.length > 0 && (
-          <div className="meal-suggestions">
+          <div className="meal-suggestions slide-in">
             <h3 className="heading-4">Meal Suggestions</h3>
             <div className="suggestions-list">
               {mealSuggestions.map((suggestion, idx) => (
-                <div key={idx} className="suggestion-card">
+                <div key={idx} className={`suggestion-card slide-in-up`} style={{animationDelay: `${idx * 0.1}s`}}>
                   <span className="suggestion-text">{suggestion}</span>
                 </div>
               ))}
@@ -833,16 +992,16 @@ function App() {
 
         {/* Coaching Stats */}
         {dailyStats && (
-          <div className="coaching-stats">
+          <div className="coaching-stats slide-in">
             <h3 className="heading-4">Today's Progress</h3>
             <div className="progress-insights">
               <div className="insight-item">
                 <span className="insight-label">Calorie Progress:</span>
-                <span className="insight-value">{Math.round(dailyStats.target_hit_percentage)}%</span>
+                <span className="insight-value animate-count">{Math.round(dailyStats.target_hit_percentage)}%</span>
               </div>
               <div className="insight-item">
                 <span className="insight-label">Protein Intake:</span>
-                <span className="insight-value">{Math.round(dailyStats.total_protein)}g / {dailyStats.protein_target}g</span>
+                <span className="insight-value animate-count">{Math.round(dailyStats.total_protein)}g / {dailyStats.protein_target}g</span>
               </div>
               <div className="insight-item">
                 <span className="insight-label">Current Streak:</span>
@@ -851,7 +1010,7 @@ function App() {
             </div>
             
             {dailyStats.target_hit_percentage < 80 && (
-              <div className="coaching-insight">
+              <div className="coaching-insight slide-in">
                 <h4 className="insight-title">💡 Coach Insight</h4>
                 <p className="insight-text">
                   You need {dailyStats.calorie_target - dailyStats.total_calories} more calories today. 
@@ -865,15 +1024,130 @@ function App() {
     </div>
   );
 
+  const renderChallenges = () => (
+    <div className="challenges-container">
+      <header className="challenges-header fade-in">
+        <button className="back-button hover-scale" onClick={() => setCurrentView('dashboard')}>← Back</button>
+        <h2 className="heading-3">🎯 Challenges</h2>
+        <button className="create-challenges-btn hover-scale" onClick={createRandomChallenges}>
+          New Challenges
+        </button>
+      </header>
+
+      <div className="challenges-content">
+        {/* Active Challenges */}
+        <div className="active-challenges">
+          <h3 className="heading-4">Active Challenges ({activeChallenges.length})</h3>
+          {activeChallenges.length > 0 ? (
+            <div className="challenges-grid">
+              {activeChallenges.map((challenge, idx) => (
+                <div key={challenge.challenge_id} className={`challenge-card ${challenge.difficulty} slide-in-up hover-lift`} style={{animationDelay: `${idx * 0.1}s`}}>
+                  <div className="challenge-header">
+                    <h4 className="challenge-title">{challenge.title}</h4>
+                    <span className={`challenge-difficulty ${challenge.difficulty}`}>
+                      {challenge.difficulty}
+                    </span>
+                  </div>
+                  <p className="challenge-description">{challenge.description}</p>
+                  
+                  <div className="challenge-progress">
+                    <div className="progress-info">
+                      <span className="progress-text">
+                        {challenge.current_progress}/{challenge.goal_value} {challenge.goal_unit}
+                      </span>
+                      <span className="progress-percentage">
+                        {Math.round(challenge.progress_percentage)}%
+                      </span>
+                    </div>
+                    <div className="progress-bar">
+                      <div 
+                        className="progress-fill animate-width" 
+                        style={{width: `${Math.min(challenge.progress_percentage, 100)}%`}}
+                      ></div>
+                    </div>
+                  </div>
+                  
+                  <div className="challenge-reward">
+                    <span className="reward-points">+{challenge.points_reward} points</span>
+                    <span className="challenge-deadline">
+                      Ends: {new Date(challenge.end_date).toLocaleDateString()}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="no-challenges">
+              <p className="body-medium">No active challenges right now.</p>
+              <button className="btn-secondary hover-scale" onClick={createRandomChallenges}>
+                Create New Challenges
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Completed Challenges */}
+        {completedChallenges.length > 0 && (
+          <div className="completed-challenges slide-in">
+            <h3 className="heading-4">Recently Completed ({completedChallenges.length})</h3>
+            <div className="challenges-grid">
+              {completedChallenges.slice(0, 6).map((challenge, idx) => (
+                <div key={challenge.user_challenge_id} className={`challenge-card completed slide-in-up`} style={{animationDelay: `${idx * 0.1}s`}}>
+                  <div className="challenge-header">
+                    <h4 className="challenge-title">{challenge.title}</h4>
+                    <span className="challenge-status completed">✓ Completed</span>
+                  </div>
+                  <p className="challenge-description">{challenge.description}</p>
+                  
+                  <div className="challenge-completion">
+                    <span className="completion-date">
+                      Completed: {new Date(challenge.completed_date).toLocaleDateString()}
+                    </span>
+                    <span className="points-earned">
+                      +{challenge.points_earned} points
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Challenge Stats */}
+        {userStats && (
+          <div className="challenge-stats slide-in">
+            <h3 className="heading-4">Challenge Statistics</h3>
+            <div className="stats-grid">
+              <div className="stat-item hover-lift">
+                <span className="stat-number animate-count">{userStats.active_challenges_count}</span>
+                <span className="stat-label">Active</span>
+              </div>
+              <div className="stat-item hover-lift">
+                <span className="stat-number animate-count">{userStats.completed_challenges_count}</span>
+                <span className="stat-label">Completed</span>
+              </div>
+              <div className="stat-item hover-lift">
+                <span className="stat-number animate-count">{userStats.challenge_points}</span>
+                <span className="stat-label">Challenge Points</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className="App">
       {renderNotification()}
+      {renderCelebration()}
       {currentView === 'onboarding' && renderOnboarding()}
       {currentView === 'dashboard' && renderDashboard()}
       {currentView === 'camera' && renderCamera()}
       {currentView === 'profile' && renderProfile()}
       {currentView === 'achievements' && renderAchievements()}
       {currentView === 'coaching' && renderCoaching()}
+      {currentView === 'challenges' && renderChallenges()}
     </div>
   );
 }
@@ -1005,7 +1279,7 @@ const OnboardingForm = ({ onSubmit, loading }) => {
         </select>
       </div>
 
-      <button type="submit" className="btn-primary" disabled={loading}>
+      <button type="submit" className={`btn-primary ${loading ? 'loading' : 'hover-scale'}`} disabled={loading}>
         {loading ? 'Creating Profile...' : 'Start Tracking'}
       </button>
     </form>
