@@ -1,38 +1,676 @@
+@import url('https://api.fontshare.com/v2/css?f[]=satoshi@400,500,600,700&display=swap');
+
+:root {
+  /* Backgrounds */
+  --bg-page: #FFFFFF;
+  --bg-card: #FFFFFF;
+  --bg-section: rgba(243, 234, 255, 0.3);
+  
+  /* Text */
+  --text-primary: rgb(24, 24, 24);
+  --text-secondary: rgb(112, 112, 112);
+  --text-muted: rgb(143, 143, 143);
+  
+  /* Borders */
+  --border-light: rgba(24, 24, 24, 0.1);
+  --border-medium: rgba(24, 24, 24, 0.2);
+  --border-strong: rgba(24, 24, 24, 0.3);
+  
+  /* Brand Colors */
+  --brand-primary: rgb(0, 128, 255);
+  --brand-hover: rgb(0, 153, 255);
+  --brand-active: rgb(0, 102, 204);
+  
+  /* Gradients */
+  --gradient-hero: linear-gradient(135deg, rgba(243, 234, 255, 0.8) 0%, rgba(255, 232, 240, 0.8) 25%, rgba(232, 244, 255, 0.8) 50%, rgba(255, 232, 213, 0.8) 75%, rgba(243, 234, 255, 0.8) 100%);
+  --gradient-button: linear-gradient(168deg, rgb(67, 67, 67) -63%, rgb(0, 0, 0) 100%);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Satoshi', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: var(--bg-page);
+  color: var(--text-primary);
+  line-height: 1.5;
+}
+
 .App {
-    text-align: center;
+  min-height: 100vh;
+  width: 100%;
 }
 
-.App-logo {
-    height: 40vmin;
-    pointer-events: none;
+/* Typography */
+.heading-1 {
+  font-family: 'Satoshi';
+  font-weight: 700;
+  font-size: clamp(32px, 5vw, 64px);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-    .App-logo {
-        animation: App-logo-spin infinite 20s linear;
-    }
+.heading-2 {
+  font-family: 'Satoshi';
+  font-weight: 600;
+  font-size: clamp(24px, 4vw, 48px);
+  line-height: 1.2;
+  letter-spacing: -0.015em;
 }
 
-.App-header {
-    background-color: #0f0f10;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-size: calc(10px + 2vmin);
-    color: white;
+.heading-3 {
+  font-family: 'Satoshi';
+  font-weight: 600;
+  font-size: clamp(20px, 3vw, 32px);
+  line-height: 1.3;
+  letter-spacing: -0.01em;
 }
 
-.App-link {
-    color: #61dafb;
+.heading-4 {
+  font-family: 'Satoshi';
+  font-weight: 600;
+  font-size: clamp(18px, 2.5vw, 24px);
+  line-height: 1.4;
+  letter-spacing: -0.005em;
 }
 
-@keyframes App-logo-spin {
-    from {
-        transform: rotate(0deg);
-    }
-    to {
-        transform: rotate(360deg);
-    }
+.body-large {
+  font-family: 'Satoshi';
+  font-weight: 400;
+  font-size: clamp(16px, 2.5vw, 20px);
+  line-height: 1.6;
+  color: var(--text-primary);
+}
+
+.body-medium {
+  font-family: 'Satoshi';
+  font-weight: 400;
+  font-size: clamp(14px, 2vw, 16px);
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+.body-small {
+  font-family: 'Satoshi';
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+/* Buttons */
+.btn-primary {
+  background: var(--gradient-button);
+  color: white;
+  border: none;
+  border-radius: 100px;
+  padding: 14px 24px;
+  font-family: 'Satoshi';
+  font-weight: 600;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-height: 48px;
+  box-shadow: 0px 4px 16px rgba(0, 0, 0, 0.12);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.3;
+}
+
+.btn-primary:hover {
+  transform: scale(1.04);
+  box-shadow: 0px 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+.btn-primary:active {
+  transform: scale(0.96);
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.2);
+  color: var(--text-primary);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 100px;
+  padding: 14px 24px;
+  font-family: 'Satoshi';
+  font-weight: 600;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-height: 48px;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  box-shadow: 0px 4px 16px rgba(0, 0, 0, 0.12);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.3;
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.02);
+}
+
+.btn-secondary:active {
+  transform: scale(0.98);
+}
+
+/* Onboarding */
+.onboarding-container {
+  min-height: 100vh;
+  background: var(--gradient-hero);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.onboarding-card {
+  background: var(--bg-card);
+  border-radius: 12px;
+  padding: 32px;
+  max-width: 500px;
+  width: 100%;
+  box-shadow: 0px 8px 24px rgba(0, 0, 0, 0.08);
+  text-align: center;
+}
+
+.onboarding-form {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  margin-top: 32px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.form-label {
+  font-family: 'Satoshi';
+  font-weight: 500;
+  font-size: 14px;
+  color: var(--text-primary);
+  text-align: left;
+}
+
+.form-input {
+  padding: 12px 16px;
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  font-family: 'Satoshi';
+  font-size: 16px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  transition: border-color 0.2s ease;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--brand-primary);
+}
+
+/* Dashboard */
+.dashboard-container {
+  padding: 24px;
+  max-width: 600px;
+  margin: 0 auto;
+  min-height: 100vh;
+}
+
+.dashboard-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  padding: 24px;
+  text-align: center;
+}
+
+.progress-circle {
+  margin: 16px 0;
+}
+
+.progress-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 6px;
+  background: var(--border-light);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 16px;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--brand-primary);
+  transition: width 0.3s ease;
+}
+
+.macro-summary {
+  display: flex;
+  justify-content: space-around;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 24px;
+}
+
+.macro-item {
+  text-align: center;
+}
+
+.action-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.recent-meals {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.meals-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.meal-card {
+  padding: 16px;
+  background: var(--bg-section);
+  border-radius: 8px;
+}
+
+.meal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.meal-type {
+  font-weight: 600;
+  text-transform: capitalize;
+  color: var(--text-primary);
+}
+
+.meal-calories {
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.meal-foods {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.food-name {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.food-name:not(:last-child)::after {
+  content: ', ';
+}
+
+/* Camera */
+.camera-container {
+  padding: 24px;
+  max-width: 600px;
+  margin: 0 auto;
+  min-height: 100vh;
+}
+
+.camera-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.back-button {
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  color: var(--text-primary);
+  padding: 8px;
+}
+
+.camera-options {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+  margin-top: 64px;
+}
+
+.camera-view {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+.camera-video {
+  width: 100%;
+  max-width: 400px;
+  border-radius: 12px;
+  object-fit: cover;
+}
+
+.camera-controls {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.capture-button {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--gradient-button);
+  border: none;
+  color: white;
+  font-size: 24px;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.capture-button:hover {
+  transform: scale(1.1);
+}
+
+.image-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+.captured-image {
+  width: 100%;
+  max-width: 400px;
+  border-radius: 12px;
+}
+
+.image-actions {
+  display: flex;
+  gap: 16px;
+}
+
+.nutrition-results {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.nutrition-summary {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.nutrition-total {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.nutrition-macros {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+}
+
+.macro {
+  padding: 4px 8px;
+  background: var(--bg-section);
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.food-items {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.food-item {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  background: var(--bg-section);
+  border-radius: 8px;
+}
+
+.food-name {
+  font-weight: 500;
+}
+
+.food-portion {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.food-calories {
+  font-weight: 500;
+  color: var(--brand-primary);
+}
+
+.meal-type-selector {
+  margin-top: 24px;
+}
+
+.meal-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.meal-btn {
+  padding: 12px 16px;
+  background: var(--bg-section);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: 'Satoshi';
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.meal-btn:hover {
+  background: var(--brand-primary);
+  color: white;
+}
+
+/* Profile */
+.profile-container {
+  padding: 24px;
+  max-width: 600px;
+  margin: 0 auto;
+  min-height: 100vh;
+}
+
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.profile-content {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.profile-stats {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.goal-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.goal-item:last-child {
+  border-bottom: none;
+}
+
+.label {
+  font-weight: 500;
+}
+
+.value {
+  font-weight: 600;
+  color: var(--brand-primary);
+}
+
+.weight-tracker {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.current-weight {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.weight-input {
+  margin-top: 16px;
+}
+
+.weight-input-field {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  font-family: 'Satoshi';
+  font-size: 16px;
+}
+
+/* Utilities */
+.loading {
+  text-align: center;
+  padding: 64px 24px;
+  color: var(--text-secondary);
+}
+
+.error-message {
+  background: rgba(255, 59, 48, 0.1);
+  color: rgb(255, 59, 48);
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-top: 16px;
+  text-align: center;
+  font-size: 14px;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 809px) {
+  .onboarding-card {
+    padding: 24px;
+  }
+  
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+  
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .action-buttons {
+    grid-template-columns: 1fr;
+  }
+  
+  .meal-buttons {
+    grid-template-columns: 1fr;
+  }
+  
+  .btn-primary,
+  .btn-secondary {
+    width: 100%;
+    min-height: 52px;
+  }
+}
+
+@media (min-width: 810px) and (max-width: 1199px) {
+  .dashboard-container,
+  .camera-container,
+  .profile-container {
+    max-width: 700px;
+  }
+}
+
+@media (min-width: 1200px) {
+  .stats-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  
+  .stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0px 8px 24px rgba(0, 0, 0, 0.08);
+  }
 }
