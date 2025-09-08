@@ -360,7 +360,7 @@ async def create_weight_entry(weight_data: dict):
 @app.get("/api/weight-entries/{user_id}")
 async def get_weight_entries(user_id: str):
     """Get weight entries for user"""
-    entries = await db.weight_entries.find({"user_id": user_id}).sort("date", -1).to_list(100)
+    entries = await db.weight_entries.find({"user_id": user_id}, {"_id": 0}).sort("date", -1).to_list(100)
     return entries
 
 @app.get("/api/daily-stats/{user_id}/{date}")
