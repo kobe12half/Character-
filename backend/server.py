@@ -368,12 +368,12 @@ async def get_daily_stats(user_id: str, date: str):
     """Get daily nutrition stats for user"""
     try:
         # Get user targets
-        user = await db.users.find_one({"user_id": user_id})
+        user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
         
         # Get food logs for the date
-        logs = await db.food_logs.find({"user_id": user_id, "date": date}).to_list(100)
+        logs = await db.food_logs.find({"user_id": user_id, "date": date}, {"_id": 0}).to_list(100)
         
         # Calculate totals
         total_calories = sum(log['total_calories'] for log in logs)
