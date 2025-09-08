@@ -558,18 +558,16 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Enhanced Food Logging with Gamification"
-    - "Enhanced Weight Entries with Gamification"
-    - "Points System Calculation"
-    - "Streak Tracking System"
-    - "Badge System - 10 Different Badges"
-    - "User Statistics API"
-    - "Achievement API System"
-    - "Enhanced Daily Stats with Gamification"
-    - "Leaderboard System"
+    - "Enhanced Dashboard with Gamification"
+    - "Gamified Food Logging Flow"
+    - "Enhanced Achievements System"
+    - "Enhanced Profile with Statistics"
+    - "Notification System"
+    - "Enhanced Mobile Responsiveness for Gamification"
+    - "Cross-Feature Gamification Integration"
   stuck_tasks: []
-  test_all: false
-  test_priority: "high_first"
+  test_all: true
+  test_priority: "completed"
 
 agent_communication:
     - agent: "testing"
