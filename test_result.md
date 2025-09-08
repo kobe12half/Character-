@@ -210,17 +210,113 @@ backend:
           agent: "testing"
           comment: "FIXED: Added {_id: 0} projection to exclude ObjectId from response. GET /api/weight-entries/{user_id} works correctly. Returns entries sorted by date in descending order for weight progression tracking."
 
-  - task: "Daily Stats Calculation"
+  - task: "Enhanced Food Logging with Gamification"
     implemented: true
-    working: true
+    working: "NA"
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
-        - working: true
+        - working: "NA"
           agent: "testing"
-          comment: "GET /api/daily-stats/{user_id}/{date} working correctly. Aggregates all food logs for specified date and calculates total nutrition vs user targets. Returns comprehensive stats including actual vs target calories, protein, carbs, and fat. Properly handles days with no food logs (returns 0 totals)."
+          comment: "Enhanced food logging with points calculation, streak tracking, and badge awarding needs comprehensive testing. Must verify points_earned, new_badges, badge_points, and current_streak in response."
+
+  - task: "Enhanced Weight Entries with Gamification"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "testing"
+          comment: "Enhanced weight entries with points awarding (30 points) and weight_logger badge after 5 entries needs testing. Must verify points and badge data in response."
+
+  - task: "Points System Calculation"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "testing"
+          comment: "Points system needs testing: Base 25 points for food log, +25 for 80% target, +50 for 100% target (calories & protein), 30 points for weight logging, variable badge bonuses (50-2000)."
+
+  - task: "Streak Tracking System"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "testing"
+          comment: "Streak logic needs testing: Same day logging (no change), next day (+1 streak), gap in days (reset to 1), multiple logs same day (count as one day)."
+
+  - task: "Badge System - 10 Different Badges"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "testing"
+          comment: "Badge system needs comprehensive testing: first_meal, streak_3/7/14/30, calorie_target, protein_master, weight_logger, goal_achieved, macro_balance badges with proper achievement conditions."
+
+  - task: "User Statistics API"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "testing"
+          comment: "GET /api/user-stats/{user_id} needs testing for comprehensive statistics: total_points, streaks, badges_earned, total_logs, weight_entries, days_active, avg_daily_calories, goal_completion_rate."
+
+  - task: "Achievement API System"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "testing"
+          comment: "GET /api/achievements/{user_id} and GET /api/badges endpoints need testing for badge awarding, retrieval, and badge icons integration."
+
+  - task: "Enhanced Daily Stats with Gamification"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "testing"
+          comment: "Enhanced GET /api/daily-stats/{user_id}/{date} needs testing for new fields: points_earned_today, streak_status, target_hit_percentage with gamification data integration."
+
+  - task: "Leaderboard System"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "testing"
+          comment: "GET /api/leaderboard endpoint needs testing for top users by points with ranking, badge counts, and social features preparation."
 
 frontend:
   - task: "Onboarding Process - User Profile Creation"
