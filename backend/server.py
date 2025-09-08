@@ -57,6 +57,10 @@ class User(BaseModel):
     last_checkin_date: Optional[str] = None
     coaching_preferences: Dict = {}
     tdee_adjustment_history: List[Dict] = []
+    # Challenge fields
+    active_challenges: List[str] = []
+    completed_challenges: List[str] = []
+    challenge_points: int = 0
 
 class FoodItem(BaseModel):
     name: str
@@ -98,10 +102,35 @@ class Achievement(BaseModel):
     earned_date: str
     created_at: str
 
+class Challenge(BaseModel):
+    challenge_id: str
+    challenge_type: str  # 'daily', 'weekly', 'streak', 'macro', 'variety'
+    title: str
+    description: str
+    goal_value: int
+    goal_unit: str  # 'calories', 'protein', 'logs', 'days', 'foods'
+    points_reward: int
+    duration_days: int
+    start_date: str
+    end_date: str
+    is_active: bool = True
+    difficulty: str = "medium"  # 'easy', 'medium', 'hard', 'epic'
+
+class UserChallenge(BaseModel):
+    user_challenge_id: str
+    user_id: str
+    challenge_id: str
+    current_progress: int
+    goal_value: int
+    is_completed: bool = False
+    points_earned: int = 0
+    started_date: str
+    completed_date: Optional[str] = None
+
 class CoachingTip(BaseModel):
     tip_id: str
     user_id: str
-    tip_type: str  # 'nutrition', 'motivation', 'reminder', 'meal_suggestion', 'progress'
+    tip_type: str  # 'nutrition', 'motivation', 'reminder', 'meal_suggestion', 'progress', 'challenge'
     title: str
     message: str
     priority: str  # 'low', 'medium', 'high', 'urgent'
@@ -141,6 +170,9 @@ class DailyStats(BaseModel):
     target_hit_percentage: float = 0.0
     # Coaching stats
     coaching_tips: List[CoachingTip] = []
+    # Challenge stats
+    active_challenges: List[UserChallenge] = []
+    completed_challenges_today: List[UserChallenge] = []
 
 class UserStats(BaseModel):
     user_id: str
@@ -153,6 +185,10 @@ class UserStats(BaseModel):
     days_active: int
     avg_daily_calories: float
     goal_completion_rate: float
+    # Challenge stats
+    challenge_points: int = 0
+    active_challenges_count: int = 0
+    completed_challenges_count: int = 0
 
 # Badge definitions
 BADGES = {
@@ -215,6 +251,102 @@ BADGES = {
         "description": "Perfect macro balance 3 days in a row",
         "points": 300,
         "icon": "⚡"
+    },
+    "challenge_champion": {
+        "name": "Challenge Champion",
+        "description": "Completed 5 challenges",
+        "points": 500,
+        "icon": "🏅"
+    },
+    "variety_explorer": {
+        "name": "Variety Explorer",
+        "description": "Logged 20 different foods",
+        "points": 300,
+        "icon": "🌈"
+    }
+}
+
+# Challenge templates
+CHALLENGE_TEMPLATES = {
+    "daily_calorie_hit": {
+        "title": "Daily Calorie Champion",
+        "description": "Hit your daily calorie target for 3 days in a row",
+        "goal_value": 3,
+        "goal_unit": "days",
+        "points_reward": 150,
+        "duration_days": 7,
+        "difficulty": "medium",
+        "type": "streak"
+    },
+    "protein_power": {
+        "title": "Protein Power Week",
+        "description": "Get 150g+ protein for 5 days this week",
+        "goal_value": 5,
+        "goal_unit": "days",
+        "points_reward": 200,
+        "duration_days": 7,
+        "difficulty": "medium",
+        "type": "macro"
+    },
+    "logging_legend": {
+        "title": "Logging Legend",
+        "description": "Log meals every day for a full week",
+        "goal_value": 7,
+        "goal_unit": "days",
+        "points_reward": 300,
+        "duration_days": 7,
+        "difficulty": "hard",
+        "type": "consistency"
+    },
+    "food_explorer": {
+        "title": "Food Explorer",
+        "description": "Try 10 new foods this week",
+        "goal_value": 10,
+        "goal_unit": "foods",
+        "points_reward": 250,
+        "duration_days": 7,
+        "difficulty": "medium",
+        "type": "variety"
+    },
+    "morning_warrior": {
+        "title": "Morning Warrior",
+        "description": "Log breakfast before 10 AM for 5 days",
+        "goal_value": 5,
+        "goal_unit": "breakfasts",
+        "points_reward": 180,
+        "duration_days": 7,
+        "difficulty": "medium",
+        "type": "timing"
+    },
+    "mega_meal": {
+        "title": "Mega Meal Master",
+        "description": "Log a single meal over 800 calories",
+        "goal_value": 1,
+        "goal_unit": "meals",
+        "points_reward": 100,
+        "duration_days": 3,
+        "difficulty": "easy",
+        "type": "single"
+    },
+    "weekend_warrior": {
+        "title": "Weekend Warrior",
+        "description": "Hit your calorie target both Saturday and Sunday",
+        "goal_value": 2,
+        "goal_unit": "days",
+        "points_reward": 120,
+        "duration_days": 2,
+        "difficulty": "medium",
+        "type": "weekend"
+    },
+    "balance_master": {
+        "title": "Balance Master",
+        "description": "Hit all macro targets (protein, carbs, fat) in one day",
+        "goal_value": 1,
+        "goal_unit": "days",
+        "points_reward": 200,
+        "duration_days": 5,
+        "difficulty": "hard",
+        "type": "macro"
     }
 }
 
@@ -224,25 +356,33 @@ MEAL_SUGGESTIONS = {
         "Oatmeal with banana, peanut butter, and whole milk (650 cal)",
         "Scrambled eggs with avocado toast and orange juice (580 cal)",
         "Greek yogurt parfait with granola and berries (520 cal)",
-        "Smoothie with protein powder, banana, and oats (480 cal)"
+        "Smoothie with protein powder, banana, and oats (480 cal)",
+        "Pancakes with syrup, butter, and bacon (720 cal)",
+        "French toast with berries and cream (640 cal)"
     ],
     "high_protein_snacks": [
         "Greek yogurt with nuts (250 cal, 20g protein)",
         "Protein smoothie with berries (300 cal, 25g protein)",
         "Cottage cheese with granola (280 cal, 22g protein)",
-        "Peanut butter on whole grain toast (320 cal, 16g protein)"
+        "Peanut butter on whole grain toast (320 cal, 16g protein)",
+        "Hard-boiled eggs with cheese (200 cal, 18g protein)",
+        "Protein bar with almond milk (290 cal, 20g protein)"
     ],
     "evening_meals": [
         "Grilled chicken with quinoa and vegetables (650 cal)",
         "Salmon with sweet potato and broccoli (580 cal)",
         "Pasta with ground turkey and marinara (720 cal)",
-        "Stir-fry with tofu and brown rice (540 cal)"
+        "Stir-fry with tofu and brown rice (540 cal)",
+        "Beef and vegetable curry with rice (680 cal)",
+        "Pork chops with mashed potatoes (620 cal)"
     ],
     "mass_building": [
         "Mass gainer smoothie: milk, banana, peanut butter, oats (750 cal)",
         "Trail mix with dried fruits and nuts (400 cal)",
         "Protein pancakes with syrup and butter (520 cal)",
-        "Chicken and rice bowl with avocado (680 cal)"
+        "Chicken and rice bowl with avocado (680 cal)",
+        "Pasta with olive oil, parmesan, and chicken (780 cal)",
+        "Loaded baked potato with cheese and bacon (650 cal)"
     ]
 }
 
@@ -318,6 +458,150 @@ def calculate_streak(last_log_date: str, current_date: str) -> tuple:
     except:
         return 1, True
 
+async def create_challenge(challenge_template: str, start_date: str = None) -> Challenge:
+    """Create a challenge from template"""
+    if start_date is None:
+        start_date = datetime.now().strftime('%Y-%m-%d')
+    
+    template = CHALLENGE_TEMPLATES.get(challenge_template)
+    if not template:
+        raise ValueError(f"Unknown challenge template: {challenge_template}")
+    
+    start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+    end_dt = start_dt + timedelta(days=template['duration_days'])
+    
+    challenge = Challenge(
+        challenge_id=str(uuid.uuid4()),
+        challenge_type=template['type'],
+        title=template['title'],
+        description=template['description'],
+        goal_value=template['goal_value'],
+        goal_unit=template['goal_unit'],
+        points_reward=template['points_reward'],
+        duration_days=template['duration_days'],
+        start_date=start_date,
+        end_date=end_dt.strftime('%Y-%m-%d'),
+        difficulty=template['difficulty']
+    )
+    
+    return challenge
+
+async def assign_challenge_to_user(user_id: str, challenge: Challenge) -> UserChallenge:
+    """Assign a challenge to a user"""
+    user_challenge = UserChallenge(
+        user_challenge_id=str(uuid.uuid4()),
+        user_id=user_id,
+        challenge_id=challenge.challenge_id,
+        current_progress=0,
+        goal_value=challenge.goal_value,
+        started_date=challenge.start_date
+    )
+    
+    await db.user_challenges.insert_one(user_challenge.dict())
+    return user_challenge
+
+async def update_challenge_progress(user_id: str, context: dict):
+    """Update progress for active user challenges"""
+    try:
+        # Get active challenges for user
+        today = datetime.now().strftime('%Y-%m-%d')
+        active_challenges = await db.user_challenges.find({
+            "user_id": user_id,
+            "is_completed": False
+        }, {"_id": 0}).to_list(100)
+        
+        completed_challenges = []
+        
+        for user_challenge in active_challenges:
+            challenge = await db.challenges.find_one(
+                {"challenge_id": user_challenge['challenge_id']}, {"_id": 0}
+            )
+            if not challenge:
+                continue
+            
+            # Check if challenge is still valid (not expired)
+            if today > challenge['end_date']:
+                continue
+            
+            progress_made = False
+            new_progress = user_challenge['current_progress']
+            
+            # Update progress based on challenge type
+            challenge_type = challenge['challenge_type']
+            
+            if challenge_type == 'streak' and context.get('trigger') == 'food_logged':
+                # Daily calorie hit streak
+                if challenge['goal_unit'] == 'days':
+                    daily_stats = context.get('daily_stats')
+                    if daily_stats and daily_stats['total_calories'] >= daily_stats['calorie_target']:
+                        new_progress += 1
+                        progress_made = True
+            
+            elif challenge_type == 'macro' and context.get('trigger') == 'food_logged':
+                # Protein targets
+                daily_stats = context.get('daily_stats')
+                if daily_stats and challenge['goal_unit'] == 'days':
+                    if daily_stats['total_protein'] >= 150:  # 150g+ protein
+                        new_progress += 1
+                        progress_made = True
+            
+            elif challenge_type == 'consistency' and context.get('trigger') == 'food_logged':
+                # Daily logging
+                new_progress += 1
+                progress_made = True
+            
+            elif challenge_type == 'variety' and context.get('trigger') == 'food_logged':
+                # New foods (simplified - count unique food names)
+                food_items = context.get('food_items', [])
+                unique_foods = len(set(food['name'] for food in food_items))
+                new_progress += unique_foods
+                progress_made = True
+            
+            elif challenge_type == 'single' and context.get('trigger') == 'food_logged':
+                # Single meal over 800 calories
+                if context.get('meal_calories', 0) >= 800:
+                    new_progress = challenge['goal_value']  # Complete immediately
+                    progress_made = True
+            
+            if progress_made:
+                # Update progress
+                await db.user_challenges.update_one(
+                    {"user_challenge_id": user_challenge['user_challenge_id']},
+                    {"$set": {"current_progress": new_progress}}
+                )
+                
+                # Check if challenge is completed
+                if new_progress >= challenge['goal_value']:
+                    await db.user_challenges.update_one(
+                        {"user_challenge_id": user_challenge['user_challenge_id']},
+                        {"$set": {
+                            "is_completed": True,
+                            "points_earned": challenge['points_reward'],
+                            "completed_date": today
+                        }}
+                    )
+                    
+                    # Award points to user
+                    await db.users.update_one(
+                        {"user_id": user_id},
+                        {"$inc": {
+                            "total_points": challenge['points_reward'],
+                            "challenge_points": challenge['points_reward']
+                        },
+                        "$push": {"completed_challenges": challenge['challenge_id']}}
+                    )
+                    
+                    completed_challenges.append({
+                        "challenge": challenge,
+                        "points": challenge['points_reward']
+                    })
+        
+        return completed_challenges
+        
+    except Exception as e:
+        print(f"Error updating challenge progress: {e}")
+        return []
+
 async def generate_ai_coaching_tip(user_data: dict, context: dict) -> str:
     """Generate personalized coaching tip using AI"""
     try:
@@ -342,6 +626,7 @@ async def generate_ai_coaching_tip(user_data: dict, context: dict) -> str:
         - Time of day: {context.get('time_of_day', 'unknown')}
         - Last meal: {context.get('last_meal_type', 'none')}
         - Days since last log: {context.get('days_since_last_log', 0)}
+        - Active challenges: {context.get('active_challenges', 0)}
         
         Provide a short, encouraging tip (1-2 sentences) that's specific to their situation. Be supportive and actionable.
         """
@@ -350,13 +635,13 @@ async def generate_ai_coaching_tip(user_data: dict, context: dict) -> str:
         return response.strip()
     except Exception as e:
         # Fallback tips
-        fallback_tips = [
-            "You're doing great! Keep up the consistent logging to build healthy habits.",
-            "Remember, small consistent gains lead to big results. You've got this!",
-            "Focus on nutrient-dense foods to reach your goals efficiently.",
-            "Stay hydrated and get enough sleep to support your weight gain journey."
+        challenge_tips = [
+            "You're doing great! Check out your active challenges for extra motivation.",
+            "Keep pushing towards your goals - every meal counts towards your success!",
+            "Consistency is key! Try to hit your targets and complete challenges for bonus points.",
+            "Remember, small consistent gains lead to big results. You've got this!"
         ]
-        return random.choice(fallback_tips)
+        return random.choice(challenge_tips)
 
 async def analyze_user_patterns(user_id: str) -> dict:
     """Analyze user eating patterns and behaviors"""
@@ -372,6 +657,7 @@ async def analyze_user_patterns(user_id: str) -> dict:
         daily_calories = {}
         meal_times = {"breakfast": 0, "lunch": 0, "dinner": 0, "snack": 0}
         total_days = 0
+        unique_foods = set()
         
         for log in recent_logs:
             date = log['date']
@@ -380,6 +666,10 @@ async def analyze_user_patterns(user_id: str) -> dict:
                 total_days += 1
             daily_calories[date] += log['total_calories']
             meal_times[log['meal_type']] += 1
+            
+            # Track unique foods
+            for food in log.get('food_items', []):
+                unique_foods.add(food['name'])
         
         avg_daily_calories = sum(daily_calories.values()) / max(total_days, 1)
         most_common_meal = max(meal_times, key=meal_times.get)
@@ -388,14 +678,18 @@ async def analyze_user_patterns(user_id: str) -> dict:
             "avg_daily_calories": avg_daily_calories,
             "most_common_meal": most_common_meal,
             "logging_consistency": total_days / 7,  # 0-1 scale
-            "daily_calories": daily_calories
+            "daily_calories": daily_calories,
+            "unique_foods_count": len(unique_foods),
+            "food_variety": list(unique_foods)
         }
     except Exception as e:
         return {
             "avg_daily_calories": 0,
             "most_common_meal": "breakfast",
             "logging_consistency": 0,
-            "daily_calories": {}
+            "daily_calories": {},
+            "unique_foods_count": 0,
+            "food_variety": []
         }
 
 async def create_coaching_tip(user_id: str, tip_type: str, title: str, message: str, 
@@ -440,12 +734,19 @@ async def generate_contextual_tips(user_id: str, trigger_context: dict):
         # Time-based context
         time_of_day = "morning" if current_hour < 12 else "afternoon" if current_hour < 18 else "evening"
         
+        # Get active challenges count
+        active_challenges_count = await db.user_challenges.count_documents({
+            "user_id": user_id,
+            "is_completed": False
+        })
+        
         context = {
             "calories_today": daily_stats['total_calories'],
             "protein_today": daily_stats['total_protein'],
             "time_of_day": time_of_day,
             "current_hour": current_hour,
-            "patterns": patterns
+            "patterns": patterns,
+            "active_challenges": active_challenges_count
         }
         
         # Generate tips based on different scenarios
@@ -460,7 +761,23 @@ async def generate_contextual_tips(user_id: str, trigger_context: dict):
                 "high", context
             )
         
-        # 2. Low protein
+        # 2. Challenge motivation
+        if active_challenges_count > 0 and random.random() < 0.3:  # 30% chance
+            await create_coaching_tip(
+                user_id, "challenge", "Challenge Update",
+                f"You have {active_challenges_count} active challenges! Check your progress and keep pushing! 🏆",
+                "medium", context
+            )
+        
+        # 3. Food variety encouragement
+        if patterns['unique_foods_count'] < 5 and random.random() < 0.2:  # 20% chance
+            await create_coaching_tip(
+                user_id, "nutrition", "Try Something New",
+                f"You've logged {patterns['unique_foods_count']} different foods this week. Try adding some variety to your meals! 🌈",
+                "low", context
+            )
+        
+        # 4. Low protein
         protein_percentage = (daily_stats['total_protein'] / daily_stats['protein_target']) * 100
         if protein_percentage < 60 and current_hour > 12:
             suggestions = random.sample(MEAL_SUGGESTIONS["high_protein_snacks"], 2)
@@ -470,30 +787,12 @@ async def generate_contextual_tips(user_id: str, trigger_context: dict):
                 "medium", context
             )
         
-        # 3. Great streak encouragement
+        # 5. Great streak encouragement with challenge mention
         if user.get('current_streak', 0) >= 3:
             await create_coaching_tip(
                 user_id, "motivation", "Streak Champion!",
-                f"Amazing {user['current_streak']}-day streak! Consistency is key to reaching your goals.",
+                f"Amazing {user['current_streak']}-day streak! 🔥 Keep it up and tackle some challenges for bonus points!",
                 "low", context
-            )
-        
-        # 4. Evening meal suggestions
-        if current_hour >= 18 and calorie_percentage < 80:
-            suggestions = random.sample(MEAL_SUGGESTIONS["evening_meals"], 2)
-            await create_coaching_tip(
-                user_id, "meal_suggestion", "Evening Fuel",
-                f"Great time for a substantial meal! Try: {suggestions[0]}",
-                "medium", context
-            )
-        
-        # 5. Morning motivation
-        if current_hour < 10 and daily_stats['total_calories'] == 0:
-            suggestions = random.sample(MEAL_SUGGESTIONS["high_calorie_breakfast"], 2)
-            await create_coaching_tip(
-                user_id, "meal_suggestion", "Morning Fuel",
-                f"Start strong! Try: {suggestions[0]}",
-                "medium", context
             )
             
     except Exception as e:
@@ -522,6 +821,16 @@ async def check_and_award_badges(user_id: str, user_data: dict, log_count: int =
     # Weight logger badge
     if 'weight_logger' not in current_badges and weight_count >= 5:
         new_badges.append('weight_logger')
+    
+    # Challenge champion badge
+    completed_challenges_count = len(user_data.get('completed_challenges', []))
+    if 'challenge_champion' not in current_badges and completed_challenges_count >= 5:
+        new_badges.append('challenge_champion')
+    
+    # Variety explorer badge
+    patterns = await analyze_user_patterns(user_id)
+    if 'variety_explorer' not in current_badges and patterns['unique_foods_count'] >= 20:
+        new_badges.append('variety_explorer')
     
     # Calorie target badge (check today's performance)
     today = datetime.now().strftime('%Y-%m-%d')
@@ -692,11 +1001,11 @@ async def analyze_food_image(image_base64: str) -> dict:
 # API Routes
 @app.get("/api/health")
 async def health_check():
-    return {"status": "healthy", "message": "Weight Gain App API with Smart Coaching is running"}
+    return {"status": "healthy", "message": "Weight Gain App API with Challenges & Entertainment is running"}
 
 @app.post("/api/users")
 async def create_user(user_data: dict):
-    """Create new user profile with coaching initialization"""
+    """Create new user profile with coaching initialization and starter challenges"""
     try:
         user_id = str(uuid.uuid4())
         
@@ -740,17 +1049,28 @@ async def create_user(user_data: dict):
             # Coaching initialization
             last_checkin_date=None,
             coaching_preferences={},
-            tdee_adjustment_history=[]
+            tdee_adjustment_history=[],
+            # Challenge initialization
+            active_challenges=[],
+            completed_challenges=[],
+            challenge_points=0
         )
         
         await db.users.insert_one(user.dict())
         
         # Create welcome coaching tip
         await create_coaching_tip(
-            user_id, "motivation", "Welcome!",
-            f"Welcome {user_data['name']}! Your daily calorie target is {daily_calorie_target}. Start by logging your first meal to begin your journey!",
+            user_id, "motivation", "Welcome to Your Journey!",
+            f"Welcome {user_data['name']}! 🎉 Your daily calorie target is {daily_calorie_target}. Start by logging your first meal and take on some challenges to earn bonus points!",
             "high", {"onboarding": True}, expires_hours=72
         )
+        
+        # Create starter challenges
+        starter_challenges = ["mega_meal", "morning_warrior"]
+        for challenge_template in starter_challenges:
+            challenge = await create_challenge(challenge_template)
+            await db.challenges.insert_one(challenge.dict())
+            await assign_challenge_to_user(user_id, challenge)
         
         return {"user_id": user_id, "user": user.dict()}
         
@@ -786,7 +1106,7 @@ async def analyze_food(file: UploadFile = File(...), user_id: str = Form(...)):
 
 @app.post("/api/food-logs")
 async def create_food_log(log_data: dict):
-    """Create new food log entry with gamification and coaching"""
+    """Create new food log entry with gamification, coaching, and challenges"""
     try:
         log_id = str(uuid.uuid4())
         
@@ -858,13 +1178,20 @@ async def create_food_log(log_data: dict):
             log_data['user_id'], user_updated, log_count=log_count
         )
         
-        # Generate contextual coaching tips
-        await generate_contextual_tips(log_data['user_id'], {
+        # Update challenge progress
+        daily_stats = await get_daily_stats_data(log_data['user_id'], current_date)
+        challenge_context = {
             "trigger": "food_logged",
             "meal_type": log_data['meal_type'],
-            "calories": total_calories,
-            "protein": total_protein
-        })
+            "meal_calories": total_calories,
+            "food_items": log_data['food_items'],
+            "daily_stats": daily_stats
+        }
+        
+        completed_challenges = await update_challenge_progress(log_data['user_id'], challenge_context)
+        
+        # Generate contextual coaching tips
+        await generate_contextual_tips(log_data['user_id'], challenge_context)
         
         return {
             "log_id": log_id, 
@@ -872,7 +1199,8 @@ async def create_food_log(log_data: dict):
             "points_earned": points_earned,
             "new_badges": new_badges,
             "badge_points": badge_points,
-            "current_streak": new_streak
+            "current_streak": new_streak,
+            "completed_challenges": completed_challenges
         }
         
     except Exception as e:
@@ -890,7 +1218,7 @@ async def get_food_logs(user_id: str, date: Optional[str] = None):
 
 @app.post("/api/weight-entries")
 async def create_weight_entry(weight_data: dict):
-    """Create new weight entry with gamification and coaching"""
+    """Create new weight entry with gamification, coaching, and challenges"""
     try:
         entry_id = str(uuid.uuid4())
         
@@ -960,14 +1288,14 @@ async def generate_weight_progress_tip(user_id: str, current_weight: float):
         
         if weight_change > 0:
             await create_coaching_tip(
-                user_id, "progress", "Weight Gain Progress!",
-                f"Great job! You've gained {weight_change:.1f}kg. Only {remaining_weight:.1f}kg to your goal!",
+                user_id, "progress", "Weight Gain Progress! 🎉",
+                f"Fantastic! You've gained {weight_change:.1f}kg. Only {remaining_weight:.1f}kg to your goal! Keep up the great work and tackle some challenges! 💪",
                 "high", {"weight_change": weight_change, "remaining": remaining_weight}
             )
         elif weight_change < -0.5:
             await create_coaching_tip(
-                user_id, "progress", "Let's Get Back on Track",
-                f"No worries about the {abs(weight_change):.1f}kg dip. Focus on consistent eating and you'll bounce back!",
+                user_id, "progress", "Stay Strong! 💪",
+                f"Don't worry about the {abs(weight_change):.1f}kg dip. Focus on consistent eating and completing challenges - you'll bounce back stronger! 🔥",
                 "medium", {"weight_change": weight_change}
             )
             
@@ -982,7 +1310,7 @@ async def get_weight_entries(user_id: str):
 
 @app.get("/api/daily-stats/{user_id}/{date}")
 async def get_daily_stats(user_id: str, date: str):
-    """Get daily nutrition stats for user with gamification and coaching data"""
+    """Get daily nutrition stats for user with gamification, coaching and challenge data"""
     try:
         # Get user targets
         user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
@@ -1011,6 +1339,18 @@ async def get_daily_stats(user_id: str, date: str):
             "is_read": False
         }, {"_id": 0}).sort("priority", -1).to_list(10)
         
+        # Get active challenges
+        active_challenges = await db.user_challenges.find({
+            "user_id": user_id,
+            "is_completed": False
+        }, {"_id": 0}).to_list(20)
+        
+        # Get completed challenges today
+        completed_challenges_today = await db.user_challenges.find({
+            "user_id": user_id,
+            "completed_date": date
+        }, {"_id": 0}).to_list(20)
+        
         stats = DailyStats(
             date=date,
             total_calories=total_calories,
@@ -1024,7 +1364,9 @@ async def get_daily_stats(user_id: str, date: str):
             points_earned_today=points_earned_today,
             streak_status=streak_status,
             target_hit_percentage=target_hit_percentage,
-            coaching_tips=coaching_tips
+            coaching_tips=coaching_tips,
+            active_challenges=active_challenges,
+            completed_challenges_today=completed_challenges_today
         )
         
         return stats.dict()
@@ -1044,6 +1386,16 @@ async def get_user_stats(user_id: str):
         # Get aggregate statistics
         total_logs = await db.food_logs.count_documents({"user_id": user_id})
         total_weight_entries = await db.weight_entries.count_documents({"user_id": user_id})
+        
+        # Get challenge statistics
+        active_challenges_count = await db.user_challenges.count_documents({
+            "user_id": user_id,
+            "is_completed": False
+        })
+        completed_challenges_count = await db.user_challenges.count_documents({
+            "user_id": user_id,
+            "is_completed": True
+        })
         
         # Calculate average daily calories (last 30 days)
         thirty_days_ago = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
@@ -1078,7 +1430,10 @@ async def get_user_stats(user_id: str):
             total_weight_entries=total_weight_entries,
             days_active=days_active,
             avg_daily_calories=round(avg_daily_calories, 1),
-            goal_completion_rate=round(goal_completion_rate, 1)
+            goal_completion_rate=round(goal_completion_rate, 1),
+            challenge_points=user.get('challenge_points', 0),
+            active_challenges_count=active_challenges_count,
+            completed_challenges_count=completed_challenges_count
         )
         
         return stats.dict()
@@ -1111,7 +1466,7 @@ async def get_leaderboard(limit: int = 10):
         # Get top users by total points
         users = await db.users.find(
             {}, 
-            {"_id": 0, "name": 1, "total_points": 1, "current_streak": 1, "badges_earned": 1}
+            {"_id": 0, "name": 1, "total_points": 1, "current_streak": 1, "badges_earned": 1, "challenge_points": 1}
         ).sort("total_points", -1).limit(limit).to_list(limit)
         
         # Add ranking and ensure all fields are present
@@ -1121,12 +1476,13 @@ async def get_leaderboard(limit: int = 10):
             user['current_streak'] = user.get('current_streak', 0)
             user['badges_earned'] = user.get('badges_earned', [])
             user['badge_count'] = len(user['badges_earned'])
+            user['challenge_points'] = user.get('challenge_points', 0)
         
         return users
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# New Coaching API Endpoints
+# Coaching API Endpoints
 @app.get("/api/coaching/tips/{user_id}")
 async def get_coaching_tips(user_id: str, limit: int = 20, unread_only: bool = False):
     """Get coaching tips for user"""
@@ -1314,8 +1670,8 @@ async def perform_weekly_checkin(user_id: str):
             
             # Create coaching tip about the adjustment
             await create_coaching_tip(
-                user_id, "progress", "Target Adjusted!",
-                f"Based on your progress, your daily target is now {new_target} calories. {coaching_summary}",
+                user_id, "progress", "Target Adjusted! 🎯",
+                f"Based on your progress, your daily target is now {new_target} calories. {coaching_summary} Keep up the great work and tackle some challenges! 💪",
                 "high", context, expires_hours=72
             )
         
@@ -1337,6 +1693,133 @@ async def get_weekly_checkins(user_id: str, limit: int = 10):
             {"user_id": user_id}, {"_id": 0}
         ).sort("week_end_date", -1).limit(limit).to_list(limit)
         return checkins
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Challenge API Endpoints
+@app.get("/api/challenges")
+async def get_available_challenges():
+    """Get all available challenge templates"""
+    return CHALLENGE_TEMPLATES
+
+@app.get("/api/challenges/active/{user_id}")
+async def get_active_challenges(user_id: str):
+    """Get active challenges for user with progress"""
+    try:
+        # Get active user challenges
+        user_challenges = await db.user_challenges.find({
+            "user_id": user_id,
+            "is_completed": False
+        }, {"_id": 0}).to_list(50)
+        
+        # Get challenge details for each
+        active_challenges = []
+        for user_challenge in user_challenges:
+            challenge = await db.challenges.find_one(
+                {"challenge_id": user_challenge['challenge_id']}, {"_id": 0}
+            )
+            if challenge:
+                # Check if challenge is still valid
+                today = datetime.now().strftime('%Y-%m-%d')
+                if today <= challenge['end_date']:
+                    combined = {
+                        **user_challenge,
+                        **challenge,
+                        "progress_percentage": (user_challenge['current_progress'] / user_challenge['goal_value']) * 100
+                    }
+                    active_challenges.append(combined)
+        
+        return active_challenges
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/challenges/completed/{user_id}")
+async def get_completed_challenges(user_id: str, limit: int = 20):
+    """Get completed challenges for user"""
+    try:
+        completed_challenges = await db.user_challenges.find({
+            "user_id": user_id,
+            "is_completed": True
+        }, {"_id": 0}).sort("completed_date", -1).limit(limit).to_list(limit)
+        
+        # Get challenge details
+        for user_challenge in completed_challenges:
+            challenge = await db.challenges.find_one(
+                {"challenge_id": user_challenge['challenge_id']}, {"_id": 0}
+            )
+            if challenge:
+                user_challenge.update(challenge)
+        
+        return completed_challenges
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/challenges/join/{user_id}")
+async def join_challenge(user_id: str, challenge_data: dict):
+    """Join a new challenge"""
+    try:
+        challenge_template = challenge_data.get('challenge_template')
+        if not challenge_template or challenge_template not in CHALLENGE_TEMPLATES:
+            raise HTTPException(status_code=400, detail="Invalid challenge template")
+        
+        # Check if user already has this challenge active
+        existing = await db.user_challenges.find_one({
+            "user_id": user_id,
+            "is_completed": False
+        })
+        
+        # Create new challenge
+        challenge = await create_challenge(challenge_template)
+        await db.challenges.insert_one(challenge.dict())
+        
+        # Assign to user
+        user_challenge = await assign_challenge_to_user(user_id, challenge)
+        
+        # Create motivation tip
+        await create_coaching_tip(
+            user_id, "challenge", "New Challenge Accepted! 🏆",
+            f"You've joined '{challenge.title}'! {challenge.description}. Earn {challenge.points_reward} points when you complete it! 💪",
+            "high", {"challenge_id": challenge.challenge_id}
+        )
+        
+        return {
+            "success": True,
+            "challenge": challenge.dict(),
+            "user_challenge": user_challenge.dict()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/challenges/create-random/{user_id}")
+async def create_random_challenges(user_id: str):
+    """Create 2-3 random challenges for user"""
+    try:
+        # Select 2-3 random challenge templates
+        available_templates = list(CHALLENGE_TEMPLATES.keys())
+        selected_templates = random.sample(available_templates, min(3, len(available_templates)))
+        
+        created_challenges = []
+        for template in selected_templates:
+            challenge = await create_challenge(template)
+            await db.challenges.insert_one(challenge.dict())
+            user_challenge = await assign_challenge_to_user(user_id, challenge)
+            created_challenges.append({
+                "challenge": challenge.dict(),
+                "user_challenge": user_challenge.dict()
+            })
+        
+        # Create notification
+        await create_coaching_tip(
+            user_id, "challenge", "New Challenges Available! 🎯",
+            f"Great news! {len(created_challenges)} new challenges are ready for you. Complete them to earn bonus points and stay motivated! 🏆",
+            "high", {"new_challenges": len(created_challenges)}
+        )
+        
+        return {
+            "success": True,
+            "challenges_created": len(created_challenges),
+            "challenges": created_challenges
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
