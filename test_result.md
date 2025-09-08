@@ -678,13 +678,16 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Enhanced Dashboard with Gamification"
-    - "Gamified Food Logging Flow"
-    - "Enhanced Achievements System"
-    - "Enhanced Profile with Statistics"
-    - "Notification System"
-    - "Enhanced Mobile Responsiveness for Gamification"
-    - "Cross-Feature Gamification Integration"
+    - "AI-Powered Coaching Tips with Emergent LLM"
+    - "Contextual Tip Generation System"
+    - "Smart Meal Recommendations"
+    - "Weekly Check-in and TDEE Adjustment System"
+    - "Coaching Tip Management System"
+    - "Enhanced User Creation with Welcome Coaching"
+    - "Enhanced Food Logging with Coaching Integration"
+    - "Enhanced Weight Entries with Progress Coaching"
+    - "Enhanced Daily Stats with Coaching Tips"
+    - "Weekly Check-in History API"
   stuck_tasks: []
   test_all: true
   test_priority: "completed"
