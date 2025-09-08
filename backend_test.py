@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Comprehensive Backend Testing for Weight Gain App - GAMIFICATION SYSTEM
-Tests all API endpoints with focus on new gamification features
+Comprehensive Backend Testing for Weight Gain App - SMART COACHING SYSTEM (Phase 3)
+Tests all API endpoints with focus on new AI-powered coaching features
 """
 
 import requests
