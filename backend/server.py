@@ -3,13 +3,14 @@ import uuid
 import base64
 import asyncio
 from datetime import datetime, timedelta
-from typing import Optional, List
+from typing import Optional, List, Dict
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from motor.motor_asyncio import AsyncIOMotorClient
 from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
 import json
+import random
 
 app = FastAPI()
 
@@ -52,6 +53,10 @@ class User(BaseModel):
     longest_streak: int = 0
     last_log_date: Optional[str] = None
     badges_earned: List[str] = []
+    # Coaching fields
+    last_checkin_date: Optional[str] = None
+    coaching_preferences: Dict = {}
+    tdee_adjustment_history: List[Dict] = []
 
 class FoodItem(BaseModel):
     name: str
@@ -93,6 +98,33 @@ class Achievement(BaseModel):
     earned_date: str
     created_at: str
 
+class CoachingTip(BaseModel):
+    tip_id: str
+    user_id: str
+    tip_type: str  # 'nutrition', 'motivation', 'reminder', 'meal_suggestion', 'progress'
+    title: str
+    message: str
+    priority: str  # 'low', 'medium', 'high', 'urgent'
+    context: Dict  # Additional context data
+    is_read: bool = False
+    created_at: str
+    expires_at: Optional[str] = None
+
+class WeeklyCheckin(BaseModel):
+    checkin_id: str
+    user_id: str
+    week_start_date: str
+    week_end_date: str
+    starting_weight: float
+    ending_weight: float
+    weight_change: float
+    expected_change: float
+    avg_daily_calories: float
+    goal_hit_rate: float
+    tdee_adjustment: int
+    coaching_summary: str
+    created_at: str
+
 class DailyStats(BaseModel):
     date: str
     total_calories: int
@@ -107,6 +139,8 @@ class DailyStats(BaseModel):
     points_earned_today: int = 0
     streak_status: bool = False
     target_hit_percentage: float = 0.0
+    # Coaching stats
+    coaching_tips: List[CoachingTip] = []
 
 class UserStats(BaseModel):
     user_id: str
@@ -184,6 +218,34 @@ BADGES = {
     }
 }
 
+# Coaching meal suggestions
+MEAL_SUGGESTIONS = {
+    "high_calorie_breakfast": [
+        "Oatmeal with banana, peanut butter, and whole milk (650 cal)",
+        "Scrambled eggs with avocado toast and orange juice (580 cal)",
+        "Greek yogurt parfait with granola and berries (520 cal)",
+        "Smoothie with protein powder, banana, and oats (480 cal)"
+    ],
+    "high_protein_snacks": [
+        "Greek yogurt with nuts (250 cal, 20g protein)",
+        "Protein smoothie with berries (300 cal, 25g protein)",
+        "Cottage cheese with granola (280 cal, 22g protein)",
+        "Peanut butter on whole grain toast (320 cal, 16g protein)"
+    ],
+    "evening_meals": [
+        "Grilled chicken with quinoa and vegetables (650 cal)",
+        "Salmon with sweet potato and broccoli (580 cal)",
+        "Pasta with ground turkey and marinara (720 cal)",
+        "Stir-fry with tofu and brown rice (540 cal)"
+    ],
+    "mass_building": [
+        "Mass gainer smoothie: milk, banana, peanut butter, oats (750 cal)",
+        "Trail mix with dried fruits and nuts (400 cal)",
+        "Protein pancakes with syrup and butter (520 cal)",
+        "Chicken and rice bowl with avocado (680 cal)"
+    ]
+}
+
 # Helper functions
 def calculate_tdee(age: int, height_cm: float, weight_kg: float, gender: str, activity_level: str) -> int:
     """Calculate Total Daily Energy Expenditure using Mifflin-St Jeor equation"""
@@ -255,6 +317,187 @@ def calculate_streak(last_log_date: str, current_date: str) -> tuple:
             return 1, True  # Streak broken, start new
     except:
         return 1, True
+
+async def generate_ai_coaching_tip(user_data: dict, context: dict) -> str:
+    """Generate personalized coaching tip using AI"""
+    try:
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=f"coaching_{uuid.uuid4()}",
+            system_message="You are a supportive weight gain coach. Provide encouraging, personalized tips that are actionable and motivating."
+        ).with_model("openai", "gpt-4o")
+        
+        prompt = f"""
+        Create a personalized coaching tip for this user:
+        
+        User Profile:
+        - Name: {user_data.get('name', 'User')}
+        - Goal: Gain weight from {user_data.get('weight_kg')}kg to {user_data.get('goal_weight_kg')}kg
+        - Daily calorie target: {user_data.get('daily_calorie_target')} calories
+        - Current streak: {user_data.get('current_streak', 0)} days
+        
+        Current Context:
+        - Today's calories: {context.get('calories_today', 0)}/{user_data.get('daily_calorie_target')}
+        - Today's protein: {context.get('protein_today', 0)}g/{user_data.get('daily_protein_target')}g
+        - Time of day: {context.get('time_of_day', 'unknown')}
+        - Last meal: {context.get('last_meal_type', 'none')}
+        - Days since last log: {context.get('days_since_last_log', 0)}
+        
+        Provide a short, encouraging tip (1-2 sentences) that's specific to their situation. Be supportive and actionable.
+        """
+        
+        response = await chat.send_message(UserMessage(text=prompt))
+        return response.strip()
+    except Exception as e:
+        # Fallback tips
+        fallback_tips = [
+            "You're doing great! Keep up the consistent logging to build healthy habits.",
+            "Remember, small consistent gains lead to big results. You've got this!",
+            "Focus on nutrient-dense foods to reach your goals efficiently.",
+            "Stay hydrated and get enough sleep to support your weight gain journey."
+        ]
+        return random.choice(fallback_tips)
+
+async def analyze_user_patterns(user_id: str) -> dict:
+    """Analyze user eating patterns and behaviors"""
+    try:
+        # Get last 7 days of food logs
+        seven_days_ago = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
+        recent_logs = await db.food_logs.find({
+            "user_id": user_id,
+            "date": {"$gte": seven_days_ago}
+        }, {"_id": 0}).to_list(100)
+        
+        # Analyze patterns
+        daily_calories = {}
+        meal_times = {"breakfast": 0, "lunch": 0, "dinner": 0, "snack": 0}
+        total_days = 0
+        
+        for log in recent_logs:
+            date = log['date']
+            if date not in daily_calories:
+                daily_calories[date] = 0
+                total_days += 1
+            daily_calories[date] += log['total_calories']
+            meal_times[log['meal_type']] += 1
+        
+        avg_daily_calories = sum(daily_calories.values()) / max(total_days, 1)
+        most_common_meal = max(meal_times, key=meal_times.get)
+        
+        return {
+            "avg_daily_calories": avg_daily_calories,
+            "most_common_meal": most_common_meal,
+            "logging_consistency": total_days / 7,  # 0-1 scale
+            "daily_calories": daily_calories
+        }
+    except Exception as e:
+        return {
+            "avg_daily_calories": 0,
+            "most_common_meal": "breakfast",
+            "logging_consistency": 0,
+            "daily_calories": {}
+        }
+
+async def create_coaching_tip(user_id: str, tip_type: str, title: str, message: str, 
+                             priority: str = "medium", context: dict = None, expires_hours: int = 24):
+    """Create and store a coaching tip"""
+    tip_id = str(uuid.uuid4())
+    expires_at = (datetime.now() + timedelta(hours=expires_hours)).isoformat()
+    
+    tip = CoachingTip(
+        tip_id=tip_id,
+        user_id=user_id,
+        tip_type=tip_type,
+        title=title,
+        message=message,
+        priority=priority,
+        context=context or {},
+        is_read=False,
+        created_at=datetime.now().isoformat(),
+        expires_at=expires_at
+    )
+    
+    await db.coaching_tips.insert_one(tip.dict())
+    return tip
+
+async def generate_contextual_tips(user_id: str, trigger_context: dict):
+    """Generate contextual coaching tips based on user behavior"""
+    try:
+        user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+        if not user:
+            return
+        
+        today = datetime.now().strftime('%Y-%m-%d')
+        current_hour = datetime.now().hour
+        
+        # Get today's stats
+        daily_stats = await get_daily_stats_data(user_id, today)
+        if not daily_stats:
+            return
+        
+        patterns = await analyze_user_patterns(user_id)
+        
+        # Time-based context
+        time_of_day = "morning" if current_hour < 12 else "afternoon" if current_hour < 18 else "evening"
+        
+        context = {
+            "calories_today": daily_stats['total_calories'],
+            "protein_today": daily_stats['total_protein'],
+            "time_of_day": time_of_day,
+            "current_hour": current_hour,
+            "patterns": patterns
+        }
+        
+        # Generate tips based on different scenarios
+        
+        # 1. Low calories by afternoon/evening
+        calorie_percentage = (daily_stats['total_calories'] / daily_stats['calorie_target']) * 100
+        if calorie_percentage < 50 and current_hour > 15:
+            ai_message = await generate_ai_coaching_tip(user, context)
+            await create_coaching_tip(
+                user_id, "nutrition", "Calorie Boost Needed",
+                f"You're at {daily_stats['total_calories']} calories today. {ai_message}",
+                "high", context
+            )
+        
+        # 2. Low protein
+        protein_percentage = (daily_stats['total_protein'] / daily_stats['protein_target']) * 100
+        if protein_percentage < 60 and current_hour > 12:
+            suggestions = random.sample(MEAL_SUGGESTIONS["high_protein_snacks"], 2)
+            await create_coaching_tip(
+                user_id, "meal_suggestion", "Protein Power-Up",
+                f"Your protein is at {int(daily_stats['total_protein'])}g. Try: {suggestions[0]} or {suggestions[1]}",
+                "medium", context
+            )
+        
+        # 3. Great streak encouragement
+        if user.get('current_streak', 0) >= 3:
+            await create_coaching_tip(
+                user_id, "motivation", "Streak Champion!",
+                f"Amazing {user['current_streak']}-day streak! Consistency is key to reaching your goals.",
+                "low", context
+            )
+        
+        # 4. Evening meal suggestions
+        if current_hour >= 18 and calorie_percentage < 80:
+            suggestions = random.sample(MEAL_SUGGESTIONS["evening_meals"], 2)
+            await create_coaching_tip(
+                user_id, "meal_suggestion", "Evening Fuel",
+                f"Great time for a substantial meal! Try: {suggestions[0]}",
+                "medium", context
+            )
+        
+        # 5. Morning motivation
+        if current_hour < 10 and daily_stats['total_calories'] == 0:
+            suggestions = random.sample(MEAL_SUGGESTIONS["high_calorie_breakfast"], 2)
+            await create_coaching_tip(
+                user_id, "meal_suggestion", "Morning Fuel",
+                f"Start strong! Try: {suggestions[0]}",
+                "medium", context
+            )
+            
+    except Exception as e:
+        print(f"Error generating contextual tips: {e}")
 
 async def check_and_award_badges(user_id: str, user_data: dict, log_count: int = 0, weight_count: int = 0):
     """Check for new badge achievements and award them"""
@@ -449,11 +692,11 @@ async def analyze_food_image(image_base64: str) -> dict:
 # API Routes
 @app.get("/api/health")
 async def health_check():
-    return {"status": "healthy", "message": "Weight Gain App API is running"}
+    return {"status": "healthy", "message": "Weight Gain App API with Smart Coaching is running"}
 
 @app.post("/api/users")
 async def create_user(user_data: dict):
-    """Create new user profile"""
+    """Create new user profile with coaching initialization"""
     try:
         user_id = str(uuid.uuid4())
         
@@ -493,10 +736,22 @@ async def create_user(user_data: dict):
             current_streak=0,
             longest_streak=0,
             last_log_date=None,
-            badges_earned=[]
+            badges_earned=[],
+            # Coaching initialization
+            last_checkin_date=None,
+            coaching_preferences={},
+            tdee_adjustment_history=[]
         )
         
         await db.users.insert_one(user.dict())
+        
+        # Create welcome coaching tip
+        await create_coaching_tip(
+            user_id, "motivation", "Welcome!",
+            f"Welcome {user_data['name']}! Your daily calorie target is {daily_calorie_target}. Start by logging your first meal to begin your journey!",
+            "high", {"onboarding": True}, expires_hours=72
+        )
+        
         return {"user_id": user_id, "user": user.dict()}
         
     except Exception as e:
@@ -531,7 +786,7 @@ async def analyze_food(file: UploadFile = File(...), user_id: str = Form(...)):
 
 @app.post("/api/food-logs")
 async def create_food_log(log_data: dict):
-    """Create new food log entry with gamification"""
+    """Create new food log entry with gamification and coaching"""
     try:
         log_id = str(uuid.uuid4())
         
@@ -603,6 +858,14 @@ async def create_food_log(log_data: dict):
             log_data['user_id'], user_updated, log_count=log_count
         )
         
+        # Generate contextual coaching tips
+        await generate_contextual_tips(log_data['user_id'], {
+            "trigger": "food_logged",
+            "meal_type": log_data['meal_type'],
+            "calories": total_calories,
+            "protein": total_protein
+        })
+        
         return {
             "log_id": log_id, 
             "food_log": food_log.dict(),
@@ -627,7 +890,7 @@ async def get_food_logs(user_id: str, date: Optional[str] = None):
 
 @app.post("/api/weight-entries")
 async def create_weight_entry(weight_data: dict):
-    """Create new weight entry with gamification"""
+    """Create new weight entry with gamification and coaching"""
     try:
         entry_id = str(uuid.uuid4())
         
@@ -659,6 +922,9 @@ async def create_weight_entry(weight_data: dict):
             new_badges, badge_points = await check_and_award_badges(
                 weight_data['user_id'], user, weight_count=weight_count
             )
+            
+            # Generate coaching tip based on weight progress
+            await generate_weight_progress_tip(weight_data['user_id'], weight_data['weight_kg'])
         
         return {
             "entry_id": entry_id, 
@@ -671,6 +937,43 @@ async def create_weight_entry(weight_data: dict):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+async def generate_weight_progress_tip(user_id: str, current_weight: float):
+    """Generate coaching tip based on weight progress"""
+    try:
+        user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+        if not user:
+            return
+        
+        # Get weight history
+        weight_entries = await db.weight_entries.find(
+            {"user_id": user_id}, {"_id": 0}
+        ).sort("date", -1).limit(10).to_list(10)
+        
+        if len(weight_entries) < 2:
+            return
+        
+        # Calculate progress
+        previous_weight = weight_entries[1]['weight_kg']
+        weight_change = current_weight - previous_weight
+        target_weight = user['goal_weight_kg']
+        remaining_weight = target_weight - current_weight
+        
+        if weight_change > 0:
+            await create_coaching_tip(
+                user_id, "progress", "Weight Gain Progress!",
+                f"Great job! You've gained {weight_change:.1f}kg. Only {remaining_weight:.1f}kg to your goal!",
+                "high", {"weight_change": weight_change, "remaining": remaining_weight}
+            )
+        elif weight_change < -0.5:
+            await create_coaching_tip(
+                user_id, "progress", "Let's Get Back on Track",
+                f"No worries about the {abs(weight_change):.1f}kg dip. Focus on consistent eating and you'll bounce back!",
+                "medium", {"weight_change": weight_change}
+            )
+            
+    except Exception as e:
+        print(f"Error generating weight progress tip: {e}")
+
 @app.get("/api/weight-entries/{user_id}")
 async def get_weight_entries(user_id: str):
     """Get weight entries for user"""
@@ -679,7 +982,7 @@ async def get_weight_entries(user_id: str):
 
 @app.get("/api/daily-stats/{user_id}/{date}")
 async def get_daily_stats(user_id: str, date: str):
-    """Get daily nutrition stats for user with gamification data"""
+    """Get daily nutrition stats for user with gamification and coaching data"""
     try:
         # Get user targets
         user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
@@ -701,6 +1004,13 @@ async def get_daily_stats(user_id: str, date: str):
         target_hit_percentage = min(calorie_percentage, 100)
         streak_status = user.get('last_log_date') == date
         
+        # Get coaching tips for today
+        coaching_tips = await db.coaching_tips.find({
+            "user_id": user_id,
+            "created_at": {"$gte": date + "T00:00:00", "$lte": date + "T23:59:59"},
+            "is_read": False
+        }, {"_id": 0}).sort("priority", -1).to_list(10)
+        
         stats = DailyStats(
             date=date,
             total_calories=total_calories,
@@ -713,7 +1023,8 @@ async def get_daily_stats(user_id: str, date: str):
             fat_target=user['daily_fat_target'],
             points_earned_today=points_earned_today,
             streak_status=streak_status,
-            target_hit_percentage=target_hit_percentage
+            target_hit_percentage=target_hit_percentage,
+            coaching_tips=coaching_tips
         )
         
         return stats.dict()
@@ -812,6 +1123,220 @@ async def get_leaderboard(limit: int = 10):
             user['badge_count'] = len(user['badges_earned'])
         
         return users
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# New Coaching API Endpoints
+@app.get("/api/coaching/tips/{user_id}")
+async def get_coaching_tips(user_id: str, limit: int = 20, unread_only: bool = False):
+    """Get coaching tips for user"""
+    try:
+        query = {"user_id": user_id}
+        if unread_only:
+            query["is_read"] = False
+        
+        # Also filter out expired tips
+        current_time = datetime.now().isoformat()
+        query["$or"] = [
+            {"expires_at": {"$gt": current_time}},
+            {"expires_at": None}
+        ]
+        
+        tips = await db.coaching_tips.find(query, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
+        return tips
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/coaching/tips/{tip_id}/read")
+async def mark_tip_as_read(tip_id: str):
+    """Mark a coaching tip as read"""
+    try:
+        result = await db.coaching_tips.update_one(
+            {"tip_id": tip_id},
+            {"$set": {"is_read": True}}
+        )
+        if result.modified_count > 0:
+            return {"success": True}
+        else:
+            raise HTTPException(status_code=404, detail="Tip not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/coaching/generate-tips/{user_id}")
+async def generate_tips_manual(user_id: str):
+    """Manually trigger coaching tip generation"""
+    try:
+        await generate_contextual_tips(user_id, {"trigger": "manual"})
+        return {"success": True, "message": "Coaching tips generated"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/coaching/meal-suggestions/{user_id}")
+async def get_meal_suggestions(user_id: str, meal_type: str = "any"):
+    """Get personalized meal suggestions"""
+    try:
+        user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        today = datetime.now().strftime('%Y-%m-%d')
+        daily_stats = await get_daily_stats_data(user_id, today)
+        
+        if not daily_stats:
+            # Fallback suggestions
+            suggestions = random.sample(MEAL_SUGGESTIONS["high_calorie_breakfast"], 3)
+        else:
+            current_hour = datetime.now().hour
+            calorie_percentage = (daily_stats['total_calories'] / daily_stats['calorie_target']) * 100
+            protein_percentage = (daily_stats['total_protein'] / daily_stats['protein_target']) * 100
+            
+            # Smart suggestions based on current status
+            if current_hour < 11:
+                suggestions = random.sample(MEAL_SUGGESTIONS["high_calorie_breakfast"], 3)
+            elif protein_percentage < 70:
+                suggestions = random.sample(MEAL_SUGGESTIONS["high_protein_snacks"], 3)
+            elif current_hour >= 18:
+                suggestions = random.sample(MEAL_SUGGESTIONS["evening_meals"], 3)
+            elif calorie_percentage < 60:
+                suggestions = random.sample(MEAL_SUGGESTIONS["mass_building"], 3)
+            else:
+                suggestions = random.sample(MEAL_SUGGESTIONS["high_protein_snacks"], 3)
+        
+        return {
+            "suggestions": suggestions,
+            "context": {
+                "current_hour": datetime.now().hour,
+                "calories_needed": max(0, daily_stats['calorie_target'] - daily_stats['total_calories']) if daily_stats else user['daily_calorie_target'],
+                "protein_needed": max(0, daily_stats['protein_target'] - daily_stats['total_protein']) if daily_stats else user['daily_protein_target']
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/coaching/weekly-checkin/{user_id}")
+async def perform_weekly_checkin(user_id: str):
+    """Perform weekly check-in and TDEE adjustment"""
+    try:
+        user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Calculate week dates
+        today = datetime.now()
+        week_start = (today - timedelta(days=7)).strftime('%Y-%m-%d')
+        week_end = today.strftime('%Y-%m-%d')
+        
+        # Get weight entries for the week
+        weight_entries = await db.weight_entries.find({
+            "user_id": user_id,
+            "date": {"$gte": week_start, "$lte": week_end}
+        }, {"_id": 0}).sort("date", 1).to_list(100)
+        
+        if len(weight_entries) < 2:
+            return {"success": False, "message": "Need at least 2 weight entries for weekly check-in"}
+        
+        starting_weight = weight_entries[0]['weight_kg']
+        ending_weight = weight_entries[-1]['weight_kg']
+        weight_change = ending_weight - starting_weight
+        expected_change = user['target_weekly_gain']
+        
+        # Get food logs for the week
+        food_logs = await db.food_logs.find({
+            "user_id": user_id,
+            "date": {"$gte": week_start, "$lte": week_end}
+        }, {"_id": 0}).to_list(1000)
+        
+        # Calculate average daily calories
+        daily_calories = {}
+        for log in food_logs:
+            date = log['date']
+            if date not in daily_calories:
+                daily_calories[date] = 0
+            daily_calories[date] += log['total_calories']
+        
+        avg_daily_calories = sum(daily_calories.values()) / max(len(daily_calories), 1)
+        goal_hit_rate = sum(1 for calories in daily_calories.values() 
+                           if calories >= user['daily_calorie_target'] * 0.8) / max(len(daily_calories), 1) * 100
+        
+        # Determine TDEE adjustment
+        tdee_adjustment = 0
+        if weight_change < expected_change * 0.7:  # Less than 70% of expected gain
+            tdee_adjustment = 150  # Increase calories
+        elif weight_change > expected_change * 1.3:  # More than 130% of expected gain
+            tdee_adjustment = -100  # Decrease calories slightly
+        
+        # Generate coaching summary
+        context = {
+            "weight_change": weight_change,
+            "expected_change": expected_change,
+            "avg_calories": avg_daily_calories,
+            "goal_hit_rate": goal_hit_rate
+        }
+        
+        coaching_summary = await generate_ai_coaching_tip(user, context)
+        
+        # Create weekly check-in record
+        checkin = WeeklyCheckin(
+            checkin_id=str(uuid.uuid4()),
+            user_id=user_id,
+            week_start_date=week_start,
+            week_end_date=week_end,
+            starting_weight=starting_weight,
+            ending_weight=ending_weight,
+            weight_change=weight_change,
+            expected_change=expected_change,
+            avg_daily_calories=avg_daily_calories,
+            goal_hit_rate=goal_hit_rate,
+            tdee_adjustment=tdee_adjustment,
+            coaching_summary=coaching_summary,
+            created_at=datetime.now().isoformat()
+        )
+        
+        await db.weekly_checkins.insert_one(checkin.dict())
+        
+        # Update user's calorie target if adjustment needed
+        if tdee_adjustment != 0:
+            new_target = user['daily_calorie_target'] + tdee_adjustment
+            await db.users.update_one(
+                {"user_id": user_id},
+                {"$set": {
+                    "daily_calorie_target": new_target,
+                    "last_checkin_date": week_end
+                },
+                "$push": {
+                    "tdee_adjustment_history": {
+                        "date": week_end,
+                        "adjustment": tdee_adjustment,
+                        "reason": f"Weekly check-in: {weight_change:.1f}kg vs {expected_change:.1f}kg expected"
+                    }
+                }}
+            )
+            
+            # Create coaching tip about the adjustment
+            await create_coaching_tip(
+                user_id, "progress", "Target Adjusted!",
+                f"Based on your progress, your daily target is now {new_target} calories. {coaching_summary}",
+                "high", context, expires_hours=72
+            )
+        
+        return {
+            "success": True,
+            "checkin": checkin.dict(),
+            "tdee_adjustment": tdee_adjustment,
+            "new_target": user['daily_calorie_target'] + tdee_adjustment
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/coaching/weekly-checkins/{user_id}")
+async def get_weekly_checkins(user_id: str, limit: int = 10):
+    """Get weekly check-in history"""
+    try:
+        checkins = await db.weekly_checkins.find(
+            {"user_id": user_id}, {"_id": 0}
+        ).sort("week_end_date", -1).limit(limit).to_list(limit)
+        return checkins
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
