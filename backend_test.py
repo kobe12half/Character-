@@ -1134,16 +1134,37 @@ class WeightGainAppTester:
             self.log_test("Pattern Analysis System", False, f"Exception: {str(e)}")
             return False
     
-    def run_gamification_tests(self):
-        """Run comprehensive gamification system tests"""
-        print(f"\n🎮 Starting Weight Gain App GAMIFICATION SYSTEM Tests")
+    def run_smart_coaching_tests(self):
+        """Run comprehensive Smart Coaching System tests (Phase 3)"""
+        print(f"\n🧠 Starting Weight Gain App SMART COACHING SYSTEM Tests (Phase 3)")
         print(f"Backend URL: {self.base_url}")
-        print("=" * 70)
+        print("=" * 80)
         
-        # Test sequence focusing on gamification
+        # Test sequence focusing on Smart Coaching System
         tests = [
+            # Core system tests
             self.test_health_check,
             self.test_user_creation_with_gamification,
+            
+            # Smart Coaching System tests
+            self.test_user_creation_with_coaching_welcome_tip,
+            self.test_coaching_tips_retrieval_and_filtering,
+            self.test_coaching_tip_mark_as_read,
+            self.test_manual_coaching_tip_generation,
+            self.test_smart_meal_suggestions,
+            self.test_weekly_checkin_system,
+            self.test_weekly_checkin_history,
+            
+            # Enhanced existing endpoints with coaching
+            self.test_enhanced_food_logging_with_coaching_tips,
+            self.test_enhanced_weight_entries_with_coaching_tips,
+            self.test_enhanced_daily_stats_with_coaching_tips,
+            
+            # AI and pattern analysis
+            self.test_ai_coaching_integration,
+            self.test_pattern_analysis_system,
+            
+            # Gamification system (existing functionality)
             self.test_enhanced_food_logging_gamification,
             self.test_points_system_calculation,
             self.test_streak_tracking_system,
@@ -1163,8 +1184,8 @@ class WeightGainAppTester:
                 passed += 1
             time.sleep(1)  # Small delay between tests
         
-        print("\n" + "=" * 70)
-        print(f"🎯 Gamification Test Results: {passed}/{total} tests passed")
+        print("\n" + "=" * 80)
+        print(f"🎯 Smart Coaching System Test Results: {passed}/{total} tests passed")
         
         # Summary of failures
         failures = [r for r in self.test_results if not r["success"]]
@@ -1173,7 +1194,7 @@ class WeightGainAppTester:
             for failure in failures:
                 print(f"   • {failure['test']}: {failure['details']}")
         else:
-            print("\n🎉 All gamification features working perfectly!")
+            print("\n🎉 All Smart Coaching System features working perfectly!")
         
         return passed, total, self.test_results
 
