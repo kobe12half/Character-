@@ -1,0 +1,93 @@
+{
+  "summary": {
+    "passed": 10,
+    "total": 11,
+    "success_rate": "90.9%"
+  },
+  "results": [
+    {
+      "test": "Health Check",
+      "success": true,
+      "details": "API is healthy",
+      "response_data": null,
+      "timestamp": "2025-09-08T14:21:31.279454"
+    },
+    {
+      "test": "User Creation with Gamification",
+      "success": true,
+      "details": "User created with gamification fields initialized correctly",
+      "response_data": null,
+      "timestamp": "2025-09-08T14:21:32.338440"
+    },
+    {
+      "test": "Enhanced Food Logging Gamification",
+      "success": true,
+      "details": "First meal logged successfully. Points: 25, Badges: ['first_meal'], Streak: 1",
+      "response_data": null,
+      "timestamp": "2025-09-08T14:21:33.417282"
+    },
+    {
+      "test": "Points System Calculation",
+      "success": true,
+      "details": "Points calculated correctly for target achievement: 75 points",
+      "response_data": null,
+      "timestamp": "2025-09-08T14:21:34.537892"
+    },
+    {
+      "test": "Streak Tracking System",
+      "success": true,
+      "details": "Consecutive day streak working: 2 days",
+      "response_data": null,
+      "timestamp": "2025-09-08T14:21:35.597544"
+    },
+    {
+      "test": "Badge System Comprehensive",
+      "success": true,
+      "details": "3-day streak badge awarded correctly. Streak: 3, New badges: ['streak_3']",
+      "response_data": null,
+      "timestamp": "2025-09-08T14:21:36.690859"
+    },
+    {
+      "test": "Enhanced Weight Entries Gamification",
+      "success": true,
+      "details": "Weight logger badge awarded after 5 entries. Points: 30, Badges: ['weight_logger']",
+      "response_data": null,
+      "timestamp": "2025-09-08T14:21:38.179229"
+    },
+    {
+      "test": "User Statistics API",
+      "success": true,
+      "details": "User stats retrieved: 645 points, 4 logs, 4 badges",
+      "response_data": null,
+      "timestamp": "2025-09-08T14:21:39.421941"
+    },
+    {
+      "test": "Achievement API System",
+      "success": true,
+      "details": "Achievement APIs working. User has 4 achievements, 10 badges available",
+      "response_data": null,
+      "timestamp": "2025-09-08T14:21:40.529839"
+    },
+    {
+      "test": "Enhanced Daily Stats Gamification",
+      "success": true,
+      "details": "Daily stats with gamification: 100 points today, 100.0% target hit, streak active: False",
+      "response_data": null,
+      "timestamp": "2025-09-08T14:21:41.587275"
+    },
+    {
+      "test": "Leaderboard System",
+      "success": false,
+      "details": "Leaderboard user missing fields",
+      "response_data": {
+        "name": "Alex Johnson",
+        "rank": 2,
+        "badge_count": 0
+      },
+      "timestamp": "2025-09-08T14:21:42.668595"
+    }
+  ],
+  "backend_url": "https://gain-weight-guide.preview.emergentagent.com/api",
+  "test_timestamp": "2025-09-08T14:21:43.670487",
+  "test_focus": "Gamification System - Phase 2"
+}
