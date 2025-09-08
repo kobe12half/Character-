@@ -334,7 +334,7 @@ async def get_food_logs(user_id: str, date: Optional[str] = None):
     if date:
         query["date"] = date
     
-    logs = await db.food_logs.find(query).sort("created_at", -1).to_list(100)
+    logs = await db.food_logs.find(query, {"_id": 0}).sort("created_at", -1).to_list(100)
     return logs
 
 @app.post("/api/weight-entries")
