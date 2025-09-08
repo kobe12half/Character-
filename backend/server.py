@@ -271,7 +271,7 @@ async def create_user(user_data: dict):
 @app.get("/api/users/{user_id}")
 async def get_user(user_id: str):
     """Get user profile"""
-    user = await db.users.find_one({"user_id": user_id})
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user
