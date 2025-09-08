@@ -102,7 +102,7 @@
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
 
-user_problem_statement: "Test the enhanced Weight Gain App backend with comprehensive GAMIFICATION SYSTEM testing. This is Phase 2 with major new features including Points System, Streak Tracking, Badge System, User Statistics, and Achievement APIs."
+user_problem_statement: "Test the enhanced Weight Gain App backend with comprehensive SMART COACHING SYSTEM testing. This is Phase 3 with revolutionary AI-powered coaching features including AI-Powered Coaching Tips, Contextual Tip Generation, Meal Recommendations, Weekly Check-ins, Coaching Tip Management, and Pattern Analysis APIs."
 
 backend:
   - task: "Health Check Endpoint"
