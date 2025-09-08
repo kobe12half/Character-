@@ -102,7 +102,7 @@
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
 
-user_problem_statement: "Test the Weight Gain App backend comprehensively with focus on user profile creation, food image analysis, food logging, weight tracking, daily stats, and health check endpoints."
+user_problem_statement: "Test the Weight Gain App frontend comprehensively to ensure the complete user experience works perfectly. This is a mobile-responsive app with AI-powered food scanning."
 
 backend:
   - task: "Health Check Endpoint"
