@@ -31,6 +31,12 @@
   --color-error: #EF4444;
   --color-points: #8B5CF6;
   --color-streak: #F97316;
+  
+  /* Coaching Colors */
+  --color-coaching: #3B82F6;
+  --color-tip-high: #EF4444;
+  --color-tip-medium: #F59E0B;
+  --color-tip-low: #10B981;
 }
 
 * {
@@ -347,6 +353,100 @@ body {
   font-weight: 700;
   font-size: 18px;
   color: var(--color-streak);
+}
+
+/* Coaching Tips Section */
+.coaching-tips-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 32px;
+}
+
+.coaching-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.coach-more-btn {
+  background: var(--color-coaching);
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.coach-more-btn:hover {
+  background: #2563EB;
+}
+
+.tips-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.coaching-tip-card {
+  background: var(--bg-section);
+  border-radius: 8px;
+  padding: 16px;
+  border-left: 4px solid var(--color-coaching);
+}
+
+.coaching-tip-card.high {
+  border-left-color: var(--color-tip-high);
+}
+
+.coaching-tip-card.medium {
+  border-left-color: var(--color-tip-medium);
+}
+
+.coaching-tip-card.low {
+  border-left-color: var(--color-tip-low);
+}
+
+.tip-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.tip-title {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 16px;
+}
+
+.tip-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 18px;
+  padding: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tip-close:hover {
+  color: var(--text-primary);
+}
+
+.tip-message {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  margin: 0;
 }
 
 .stats-grid {
@@ -939,6 +1039,197 @@ body {
   margin-top: 4px;
 }
 
+/* Coaching Page */
+.coaching-container {
+  padding: 24px;
+  max-width: 800px;
+  margin: 0 auto;
+  min-height: 100vh;
+}
+
+.coaching-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 32px;
+}
+
+.generate-tips-btn {
+  background: var(--color-coaching);
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.generate-tips-btn:hover {
+  background: #2563EB;
+}
+
+.coaching-content {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.active-tips {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.tips-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.coaching-tip-card.full {
+  padding: 20px;
+  margin: 0;
+}
+
+.tip-meta {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.tip-type {
+  background: var(--bg-section);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  text-transform: capitalize;
+  color: var(--text-secondary);
+}
+
+.tip-priority {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.tip-priority.high {
+  background: var(--color-tip-high);
+  color: white;
+}
+
+.tip-priority.medium {
+  background: var(--color-tip-medium);
+  color: white;
+}
+
+.tip-priority.low {
+  background: var(--color-tip-low);
+  color: white;
+}
+
+.coaching-tip-card.full .tip-title {
+  font-size: 18px;
+  margin: 12px 0 8px 0;
+}
+
+.coaching-tip-card.full .tip-message {
+  font-size: 16px;
+  margin-bottom: 12px;
+}
+
+.tip-time {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.no-tips {
+  text-align: center;
+  padding: 32px;
+}
+
+.meal-suggestions {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.suggestions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.suggestion-card {
+  background: var(--bg-section);
+  padding: 16px;
+  border-radius: 8px;
+  border-left: 4px solid var(--color-coaching);
+}
+
+.suggestion-text {
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.coaching-stats {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.progress-insights {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.insight-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+}
+
+.insight-label {
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.insight-value {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.coaching-insight {
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 20px;
+}
+
+.insight-title {
+  font-weight: 600;
+  color: var(--color-coaching);
+  margin-bottom: 8px;
+}
+
+.insight-text {
+  font-size: 14px;
+  color: var(--text-primary);
+  line-height: 1.5;
+  margin: 0;
+}
+
 /* Utilities */
 .loading {
   text-align: center;
@@ -998,6 +1289,22 @@ body {
     gap: 16px;
   }
   
+  .coaching-header {
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+  
+  .profile-header {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  
+  .achievements-header {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  
   .btn-primary,
   .btn-secondary {
     width: 100%;
@@ -1009,7 +1316,8 @@ body {
   .dashboard-container,
   .camera-container,
   .profile-container,
-  .achievements-container {
+  .achievements-container,
+  .coaching-container {
     max-width: 700px;
   }
 }

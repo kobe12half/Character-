@@ -4,7 +4,7 @@ import './App.css';
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
 
 function App() {
-  const [currentView, setCurrentView] = useState('onboarding'); // onboarding, dashboard, camera, profile, achievements
+  const [currentView, setCurrentView] = useState('onboarding'); // onboarding, dashboard, camera, profile, achievements, coaching
   const [user, setUser] = useState(null);
   const [dailyStats, setDailyStats] = useState(null);
   const [userStats, setUserStats] = useState(null);
@@ -12,6 +12,8 @@ function App() {
   const [foodLogs, setFoodLogs] = useState([]);
   const [achievements, setAchievements] = useState([]);
   const [badges, setBadges] = useState({});
+  const [coachingTips, setCoachingTips] = useState([]);
+  const [mealSuggestions, setMealSuggestions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [notification, setNotification] = useState('');
@@ -59,6 +61,10 @@ function App() {
       if (statsResponse.ok) {
         const stats = await statsResponse.json();
         setDailyStats(stats);
+        // Extract coaching tips from daily stats
+        if (stats.coaching_tips) {
+          setCoachingTips(stats.coaching_tips);
+        }
       }
 
       // Load user stats
@@ -88,6 +94,20 @@ function App() {
         const achievementsData = await achievementsResponse.json();
         setAchievements(achievementsData);
       }
+
+      // Load coaching tips
+      const coachingResponse = await fetch(`${BACKEND_URL}/api/coaching/tips/${userId}?unread_only=true`);
+      if (coachingResponse.ok) {
+        const coachingData = await coachingResponse.json();
+        setCoachingTips(coachingData);
+      }
+
+      // Load meal suggestions
+      const suggestionsResponse = await fetch(`${BACKEND_URL}/api/coaching/meal-suggestions/${userId}`);
+      if (suggestionsResponse.ok) {
+        const suggestionsData = await suggestionsResponse.json();
+        setMealSuggestions(suggestionsData.suggestions || []);
+      }
     } catch (error) {
       console.error('Error loading dashboard data:', error);
     }
@@ -96,6 +116,37 @@ function App() {
   const showNotification = (message, type = 'success') => {
     setNotification({ message, type });
     setTimeout(() => setNotification(''), 4000);
+  };
+
+  const markTipAsRead = async (tipId) => {
+    try {
+      await fetch(`${BACKEND_URL}/api/coaching/tips/${tipId}/read`, {
+        method: 'POST'
+      });
+      // Remove the tip from the list
+      setCoachingTips(tips => tips.filter(tip => tip.tip_id !== tipId));
+    } catch (error) {
+      console.error('Error marking tip as read:', error);
+    }
+  };
+
+  const generateTips = async () => {
+    if (!user) return;
+    
+    try {
+      await fetch(`${BACKEND_URL}/api/coaching/generate-tips/${user.user_id}`, {
+        method: 'POST'
+      });
+      // Reload coaching tips
+      const coachingResponse = await fetch(`${BACKEND_URL}/api/coaching/tips/${user.user_id}?unread_only=true`);
+      if (coachingResponse.ok) {
+        const coachingData = await coachingResponse.json();
+        setCoachingTips(coachingData);
+      }
+      showNotification('New coaching tips generated! 🤖');
+    } catch (error) {
+      console.error('Error generating tips:', error);
+    }
   };
 
   const handleOnboarding = async (formData) => {
@@ -334,6 +385,32 @@ function App() {
           </div>
         </header>
 
+        {/* Coaching Tips Section */}
+        {coachingTips.length > 0 && (
+          <div className="coaching-tips-section">
+            <div className="coaching-header">
+              <h3 className="heading-4">🤖 Smart Coach</h3>
+              <button className="coach-more-btn" onClick={() => setCurrentView('coaching')}>
+                View All
+              </button>
+            </div>
+            <div className="tips-preview">
+              {coachingTips.slice(0, 2).map(tip => (
+                <div key={tip.tip_id} className={`coaching-tip-card ${tip.priority}`}>
+                  <div className="tip-header">
+                    <span className="tip-title">{tip.title}</span>
+                    <button 
+                      className="tip-close"
+                      onClick={() => markTipAsRead(tip.tip_id)}
+                    >×</button>
+                  </div>
+                  <p className="tip-message">{tip.message}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="stats-grid">
           <div className="stat-card">
             <h3 className="heading-4">Calories</h3>
@@ -407,8 +484,8 @@ function App() {
           <button className="btn-primary" onClick={() => setCurrentView('camera')}>
             📷 Scan Food
           </button>
-          <button className="btn-secondary" onClick={() => setCurrentView('profile')}>
-            📊 View Progress
+          <button className="btn-secondary" onClick={() => setCurrentView('coaching')}>
+            🤖 Smart Coach
           </button>
         </div>
 
@@ -694,6 +771,100 @@ function App() {
     </div>
   );
 
+  const renderCoaching = () => (
+    <div className="coaching-container">
+      <header className="coaching-header">
+        <button className="back-button" onClick={() => setCurrentView('dashboard')}>← Back</button>
+        <h2 className="heading-3">🤖 Smart Coach</h2>
+        <button className="generate-tips-btn" onClick={generateTips}>
+          Generate Tips
+        </button>
+      </header>
+
+      <div className="coaching-content">
+        {/* Active Tips */}
+        <div className="active-tips">
+          <h3 className="heading-4">Active Tips ({coachingTips.length})</h3>
+          {coachingTips.length > 0 ? (
+            <div className="tips-list">
+              {coachingTips.map(tip => (
+                <div key={tip.tip_id} className={`coaching-tip-card full ${tip.priority}`}>
+                  <div className="tip-header">
+                    <div className="tip-meta">
+                      <span className="tip-type">{tip.tip_type.replace('_', ' ')}</span>
+                      <span className={`tip-priority ${tip.priority}`}>{tip.priority}</span>
+                    </div>
+                    <button 
+                      className="tip-close"
+                      onClick={() => markTipAsRead(tip.tip_id)}
+                    >×</button>
+                  </div>
+                  <h4 className="tip-title">{tip.title}</h4>
+                  <p className="tip-message">{tip.message}</p>
+                  <div className="tip-time">
+                    {new Date(tip.created_at).toLocaleTimeString()}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="no-tips">
+              <p className="body-medium">No active tips right now.</p>
+              <button className="btn-secondary" onClick={generateTips}>
+                Get Personalized Tips
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Meal Suggestions */}
+        {mealSuggestions.length > 0 && (
+          <div className="meal-suggestions">
+            <h3 className="heading-4">Meal Suggestions</h3>
+            <div className="suggestions-list">
+              {mealSuggestions.map((suggestion, idx) => (
+                <div key={idx} className="suggestion-card">
+                  <span className="suggestion-text">{suggestion}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Coaching Stats */}
+        {dailyStats && (
+          <div className="coaching-stats">
+            <h3 className="heading-4">Today's Progress</h3>
+            <div className="progress-insights">
+              <div className="insight-item">
+                <span className="insight-label">Calorie Progress:</span>
+                <span className="insight-value">{Math.round(dailyStats.target_hit_percentage)}%</span>
+              </div>
+              <div className="insight-item">
+                <span className="insight-label">Protein Intake:</span>
+                <span className="insight-value">{Math.round(dailyStats.total_protein)}g / {dailyStats.protein_target}g</span>
+              </div>
+              <div className="insight-item">
+                <span className="insight-label">Current Streak:</span>
+                <span className="insight-value">{userStats?.current_streak || 0} days 🔥</span>
+              </div>
+            </div>
+            
+            {dailyStats.target_hit_percentage < 80 && (
+              <div className="coaching-insight">
+                <h4 className="insight-title">💡 Coach Insight</h4>
+                <p className="insight-text">
+                  You need {dailyStats.calorie_target - dailyStats.total_calories} more calories today. 
+                  Try adding a protein smoothie or healthy snack to reach your goal!
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className="App">
       {renderNotification()}
@@ -702,6 +873,7 @@ function App() {
       {currentView === 'camera' && renderCamera()}
       {currentView === 'profile' && renderProfile()}
       {currentView === 'achievements' && renderAchievements()}
+      {currentView === 'coaching' && renderCoaching()}
     </div>
   );
 }
