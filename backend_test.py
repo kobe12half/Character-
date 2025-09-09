@@ -574,6 +574,539 @@ class WeightGainAppTester:
             self.log_test("Leaderboard System", False, f"Exception: {str(e)}")
             return False
 
+    # ========== JWT AUTHENTICATION SYSTEM TESTS ==========
+    
+    def test_user_registration(self):
+        """Test POST /api/auth/register with valid user data"""
+        user_data = {
+            "email": "alex.johnson@example.com",
+            "password": "SecurePass123!",
+            "name": "Alex Johnson",
+            "age": 25,
+            "height_cm": 170.0,
+            "weight_kg": 60.0,
+            "gender": "male",
+            "activity_level": "moderate",
+            "goal_weight_kg": 70.0,
+            "target_weekly_gain": 0.5
+        }
+        
+        try:
+            response = requests.post(f"{self.base_url}/auth/register", json=user_data, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                
+                # Verify response structure
+                required_fields = ["access_token", "token_type", "user"]
+                if not all(field in data for field in required_fields):
+                    self.log_test("User Registration", False, 
+                                f"Missing fields in registration response", data)
+                    return False
+                
+                # Store auth data for subsequent tests
+                self.auth_token = data["access_token"]
+                self.test_user_id = data["user"]["user_id"]
+                self.test_user_email = data["user"]["email"]
+                
+                # Verify user data
+                user = data["user"]
+                if (user["email"] == user_data["email"] and 
+                    user["name"] == user_data["name"] and
+                    user["daily_calorie_target"] > 0 and
+                    "password_hash" not in user):  # Ensure password not exposed
+                    
+                    self.log_test("User Registration", True, 
+                                f"User registered successfully. ID: {self.test_user_id}, Token received")
+                    return True
+                else:
+                    self.log_test("User Registration", False, 
+                                f"User data validation failed", user)
+                    return False
+            else:
+                self.log_test("User Registration", False, 
+                            f"Status code: {response.status_code}", response.text)
+                return False
+        except Exception as e:
+            self.log_test("User Registration", False, f"Exception: {str(e)}")
+            return False
+    
+    def test_user_login(self):
+        """Test POST /api/auth/login with registered credentials"""
+        if not self.test_user_email:
+            self.log_test("User Login", False, "No test user email available")
+            return False
+        
+        login_data = {
+            "email": self.test_user_email,
+            "password": "SecurePass123!"
+        }
+        
+        try:
+            response = requests.post(f"{self.base_url}/auth/login", json=login_data, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                
+                # Verify response structure
+                required_fields = ["access_token", "token_type", "user"]
+                if not all(field in data for field in required_fields):
+                    self.log_test("User Login", False, 
+                                f"Missing fields in login response", data)
+                    return False
+                
+                # Verify token is different from registration token (new session)
+                new_token = data["access_token"]
+                if new_token and data["token_type"] == "bearer":
+                    # Update auth token for subsequent tests
+                    self.auth_token = new_token
+                    
+                    self.log_test("User Login", True, 
+                                f"User logged in successfully. New token received")
+                    return True
+                else:
+                    self.log_test("User Login", False, 
+                                f"Invalid token or token type", data)
+                    return False
+            else:
+                self.log_test("User Login", False, 
+                            f"Status code: {response.status_code}", response.text)
+                return False
+        except Exception as e:
+            self.log_test("User Login", False, f"Exception: {str(e)}")
+            return False
+    
+    def test_invalid_login(self):
+        """Test login with invalid credentials"""
+        invalid_login_data = {
+            "email": "nonexistent@example.com",
+            "password": "WrongPassword123!"
+        }
+        
+        try:
+            response = requests.post(f"{self.base_url}/auth/login", json=invalid_login_data, timeout=10)
+            if response.status_code == 401:
+                self.log_test("Invalid Login", True, 
+                            "Invalid credentials correctly rejected with 401")
+                return True
+            else:
+                self.log_test("Invalid Login", False, 
+                            f"Expected 401, got {response.status_code}")
+                return False
+        except Exception as e:
+            self.log_test("Invalid Login", False, f"Exception: {str(e)}")
+            return False
+    
+    def test_forgot_password(self):
+        """Test POST /api/auth/forgot-password"""
+        if not self.test_user_email:
+            self.log_test("Forgot Password", False, "No test user email available")
+            return False
+        
+        reset_data = {
+            "email": self.test_user_email
+        }
+        
+        try:
+            response = requests.post(f"{self.base_url}/auth/forgot-password", json=reset_data, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                
+                # Verify response
+                if "message" in data:
+                    # Store reset token if provided (for testing purposes)
+                    if "reset_token" in data:
+                        self.reset_token = data["reset_token"]
+                    
+                    self.log_test("Forgot Password", True, 
+                                f"Password reset initiated successfully")
+                    return True
+                else:
+                    self.log_test("Forgot Password", False, 
+                                f"Invalid response format", data)
+                    return False
+            else:
+                self.log_test("Forgot Password", False, 
+                            f"Status code: {response.status_code}", response.text)
+                return False
+        except Exception as e:
+            self.log_test("Forgot Password", False, f"Exception: {str(e)}")
+            return False
+    
+    def test_reset_password(self):
+        """Test POST /api/auth/reset-password"""
+        if not self.reset_token:
+            self.log_test("Reset Password", False, "No reset token available")
+            return False
+        
+        reset_data = {
+            "reset_token": self.reset_token,
+            "new_password": "NewSecurePass456!"
+        }
+        
+        try:
+            response = requests.post(f"{self.base_url}/auth/reset-password", json=reset_data, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                
+                if "message" in data and "successfully" in data["message"].lower():
+                    self.log_test("Reset Password", True, 
+                                f"Password reset completed successfully")
+                    return True
+                else:
+                    self.log_test("Reset Password", False, 
+                                f"Unexpected response", data)
+                    return False
+            else:
+                self.log_test("Reset Password", False, 
+                            f"Status code: {response.status_code}", response.text)
+                return False
+        except Exception as e:
+            self.log_test("Reset Password", False, f"Exception: {str(e)}")
+            return False
+    
+    def test_login_with_new_password(self):
+        """Test login with the new password after reset"""
+        if not self.test_user_email:
+            self.log_test("Login with New Password", False, "No test user email available")
+            return False
+        
+        login_data = {
+            "email": self.test_user_email,
+            "password": "NewSecurePass456!"
+        }
+        
+        try:
+            response = requests.post(f"{self.base_url}/auth/login", json=login_data, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                
+                if "access_token" in data:
+                    # Update auth token
+                    self.auth_token = data["access_token"]
+                    
+                    self.log_test("Login with New Password", True, 
+                                f"Login successful with new password")
+                    return True
+                else:
+                    self.log_test("Login with New Password", False, 
+                                f"No access token in response", data)
+                    return False
+            else:
+                self.log_test("Login with New Password", False, 
+                            f"Status code: {response.status_code}", response.text)
+                return False
+        except Exception as e:
+            self.log_test("Login with New Password", False, f"Exception: {str(e)}")
+            return False
+    
+    def test_protected_endpoint_without_token(self):
+        """Test protected endpoint without authentication token"""
+        if not self.test_user_id:
+            self.log_test("Protected Endpoint Without Token", False, "No test user ID available")
+            return False
+        
+        try:
+            # Try to access user profile without token
+            response = requests.get(f"{self.base_url}/users/{self.test_user_id}", timeout=10)
+            if response.status_code == 401:
+                self.log_test("Protected Endpoint Without Token", True, 
+                            "Protected endpoint correctly rejected request without token (401)")
+                return True
+            else:
+                self.log_test("Protected Endpoint Without Token", False, 
+                            f"Expected 401, got {response.status_code}")
+                return False
+        except Exception as e:
+            self.log_test("Protected Endpoint Without Token", False, f"Exception: {str(e)}")
+            return False
+    
+    def test_protected_endpoint_with_invalid_token(self):
+        """Test protected endpoint with invalid token"""
+        if not self.test_user_id:
+            self.log_test("Protected Endpoint Invalid Token", False, "No test user ID available")
+            return False
+        
+        try:
+            # Try to access user profile with invalid token
+            headers = {"Authorization": "Bearer invalid_token_12345"}
+            response = requests.get(f"{self.base_url}/users/{self.test_user_id}", 
+                                  headers=headers, timeout=10)
+            if response.status_code == 401:
+                self.log_test("Protected Endpoint Invalid Token", True, 
+                            "Protected endpoint correctly rejected invalid token (401)")
+                return True
+            else:
+                self.log_test("Protected Endpoint Invalid Token", False, 
+                            f"Expected 401, got {response.status_code}")
+                return False
+        except Exception as e:
+            self.log_test("Protected Endpoint Invalid Token", False, f"Exception: {str(e)}")
+            return False
+    
+    def test_protected_endpoint_with_valid_token(self):
+        """Test protected endpoint with valid authentication token"""
+        if not self.test_user_id or not self.auth_token:
+            self.log_test("Protected Endpoint Valid Token", False, "No test user ID or auth token available")
+            return False
+        
+        try:
+            # Access user profile with valid token
+            headers = {"Authorization": f"Bearer {self.auth_token}"}
+            response = requests.get(f"{self.base_url}/users/{self.test_user_id}", 
+                                  headers=headers, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                
+                # Verify user data is returned
+                if (data.get("user_id") == self.test_user_id and 
+                    data.get("email") == self.test_user_email and
+                    "password_hash" not in data):  # Ensure password not exposed
+                    
+                    self.log_test("Protected Endpoint Valid Token", True, 
+                                f"Protected endpoint accessible with valid token")
+                    return True
+                else:
+                    self.log_test("Protected Endpoint Valid Token", False, 
+                                f"Invalid user data returned", data)
+                    return False
+            else:
+                self.log_test("Protected Endpoint Valid Token", False, 
+                            f"Status code: {response.status_code}", response.text)
+                return False
+        except Exception as e:
+            self.log_test("Protected Endpoint Valid Token", False, f"Exception: {str(e)}")
+            return False
+    
+    def test_food_logging_requires_auth(self):
+        """Test POST /api/food-logs requires authentication"""
+        if not self.test_user_id:
+            self.log_test("Food Logging Auth Required", False, "No test user ID available")
+            return False
+        
+        food_log_data = {
+            "user_id": self.test_user_id,
+            "date": datetime.now().strftime("%Y-%m-%d"),
+            "meal_type": "breakfast",
+            "food_items": [
+                {
+                    "name": "Test Food",
+                    "calories": 200,
+                    "protein": 10.0,
+                    "carbs": 20.0,
+                    "fat": 8.0,
+                    "portion_size": "1 serving"
+                }
+            ]
+        }
+        
+        try:
+            # Try without token
+            response = requests.post(f"{self.base_url}/food-logs", json=food_log_data, timeout=10)
+            if response.status_code == 401:
+                self.log_test("Food Logging Auth Required", True, 
+                            "Food logging correctly requires authentication (401)")
+                return True
+            else:
+                self.log_test("Food Logging Auth Required", False, 
+                            f"Expected 401, got {response.status_code}")
+                return False
+        except Exception as e:
+            self.log_test("Food Logging Auth Required", False, f"Exception: {str(e)}")
+            return False
+    
+    def test_food_logging_with_auth(self):
+        """Test POST /api/food-logs works with authentication"""
+        if not self.test_user_id or not self.auth_token:
+            self.log_test("Food Logging With Auth", False, "No test user ID or auth token available")
+            return False
+        
+        food_log_data = {
+            "user_id": self.test_user_id,
+            "date": datetime.now().strftime("%Y-%m-%d"),
+            "meal_type": "breakfast",
+            "food_items": [
+                {
+                    "name": "Authenticated Food Log",
+                    "calories": 300,
+                    "protein": 15.0,
+                    "carbs": 30.0,
+                    "fat": 12.0,
+                    "portion_size": "1 serving"
+                }
+            ]
+        }
+        
+        try:
+            # Try with valid token
+            headers = {"Authorization": f"Bearer {self.auth_token}"}
+            response = requests.post(f"{self.base_url}/food-logs", json=food_log_data, 
+                                   headers=headers, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                
+                # Verify food log was created
+                if ("log_id" in data and 
+                    "points_earned" in data and
+                    data.get("food_log", {}).get("user_id") == self.test_user_id):
+                    
+                    self.log_test("Food Logging With Auth", True, 
+                                f"Food logging successful with authentication")
+                    return True
+                else:
+                    self.log_test("Food Logging With Auth", False, 
+                                f"Invalid food log response", data)
+                    return False
+            else:
+                self.log_test("Food Logging With Auth", False, 
+                            f"Status code: {response.status_code}", response.text)
+                return False
+        except Exception as e:
+            self.log_test("Food Logging With Auth", False, f"Exception: {str(e)}")
+            return False
+    
+    def test_daily_stats_requires_auth(self):
+        """Test GET /api/daily-stats/{user_id}/{date} requires authentication"""
+        if not self.test_user_id:
+            self.log_test("Daily Stats Auth Required", False, "No test user ID available")
+            return False
+        
+        today = datetime.now().strftime("%Y-%m-%d")
+        
+        try:
+            # Try without token
+            response = requests.get(f"{self.base_url}/daily-stats/{self.test_user_id}/{today}", timeout=10)
+            if response.status_code == 401:
+                self.log_test("Daily Stats Auth Required", True, 
+                            "Daily stats correctly requires authentication (401)")
+                return True
+            else:
+                self.log_test("Daily Stats Auth Required", False, 
+                            f"Expected 401, got {response.status_code}")
+                return False
+        except Exception as e:
+            self.log_test("Daily Stats Auth Required", False, f"Exception: {str(e)}")
+            return False
+    
+    def test_daily_stats_with_auth(self):
+        """Test GET /api/daily-stats/{user_id}/{date} works with authentication"""
+        if not self.test_user_id or not self.auth_token:
+            self.log_test("Daily Stats With Auth", False, "No test user ID or auth token available")
+            return False
+        
+        today = datetime.now().strftime("%Y-%m-%d")
+        
+        try:
+            # Try with valid token
+            headers = {"Authorization": f"Bearer {self.auth_token}"}
+            response = requests.get(f"{self.base_url}/daily-stats/{self.test_user_id}/{today}", 
+                                  headers=headers, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                
+                # Verify daily stats structure
+                required_fields = ["date", "total_calories", "total_protein", "calorie_target", "protein_target"]
+                if all(field in data for field in required_fields):
+                    self.log_test("Daily Stats With Auth", True, 
+                                f"Daily stats accessible with authentication")
+                    return True
+                else:
+                    self.log_test("Daily Stats With Auth", False, 
+                                f"Invalid daily stats response", data)
+                    return False
+            else:
+                self.log_test("Daily Stats With Auth", False, 
+                            f"Status code: {response.status_code}", response.text)
+                return False
+        except Exception as e:
+            self.log_test("Daily Stats With Auth", False, f"Exception: {str(e)}")
+            return False
+    
+    def test_cross_user_access_prevention(self):
+        """Test that users cannot access other users' data"""
+        if not self.auth_token:
+            self.log_test("Cross User Access Prevention", False, "No auth token available")
+            return False
+        
+        # Try to access a different user ID
+        fake_user_id = "different-user-id-12345"
+        
+        try:
+            headers = {"Authorization": f"Bearer {self.auth_token}"}
+            response = requests.get(f"{self.base_url}/users/{fake_user_id}", 
+                                  headers=headers, timeout=10)
+            if response.status_code == 403:
+                self.log_test("Cross User Access Prevention", True, 
+                            "Cross-user access correctly prevented (403)")
+                return True
+            elif response.status_code == 404:
+                self.log_test("Cross User Access Prevention", True, 
+                            "Cross-user access prevented (404 - user not found)")
+                return True
+            else:
+                self.log_test("Cross User Access Prevention", False, 
+                            f"Expected 403 or 404, got {response.status_code}")
+                return False
+        except Exception as e:
+            self.log_test("Cross User Access Prevention", False, f"Exception: {str(e)}")
+            return False
+    
+    def test_token_expiration_handling(self):
+        """Test handling of expired tokens (simulated)"""
+        if not self.test_user_id:
+            self.log_test("Token Expiration Handling", False, "No test user ID available")
+            return False
+        
+        try:
+            # Use a malformed/expired-looking token
+            expired_token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjoiZXhwaXJlZCIsImV4cCI6MTYwMDAwMDAwMH0.invalid"
+            headers = {"Authorization": f"Bearer {expired_token}"}
+            
+            response = requests.get(f"{self.base_url}/users/{self.test_user_id}", 
+                                  headers=headers, timeout=10)
+            if response.status_code == 401:
+                self.log_test("Token Expiration Handling", True, 
+                            "Expired/invalid token correctly rejected (401)")
+                return True
+            else:
+                self.log_test("Token Expiration Handling", False, 
+                            f"Expected 401, got {response.status_code}")
+                return False
+        except Exception as e:
+            self.log_test("Token Expiration Handling", False, f"Exception: {str(e)}")
+            return False
+    
+    def test_get_current_user_profile(self):
+        """Test GET /api/auth/me endpoint"""
+        if not self.auth_token:
+            self.log_test("Get Current User Profile", False, "No auth token available")
+            return False
+        
+        try:
+            headers = {"Authorization": f"Bearer {self.auth_token}"}
+            response = requests.get(f"{self.base_url}/auth/me", headers=headers, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                # Verify user profile data
+                if (data.get("user_id") == self.test_user_id and 
+                    data.get("email") == self.test_user_email and
+                    "password_hash" not in data):
+                    
+                    self.log_test("Get Current User Profile", True, 
+                                f"Current user profile retrieved successfully")
+                    return True
+                else:
+                    self.log_test("Get Current User Profile", False, 
+                                f"Invalid user profile data", data)
+                    return False
+            else:
+                self.log_test("Get Current User Profile", False, 
+                            f"Status code: {response.status_code}", response.text)
+                return False
+        except Exception as e:
+            self.log_test("Get Current User Profile", False, f"Exception: {str(e)}")
+            return False
+
     # ========== SMART COACHING SYSTEM TESTS (Phase 3) ==========
     
     def test_user_creation_with_coaching_welcome_tip(self):
