@@ -1805,16 +1805,61 @@ class WeightGainAppTester:
 
 if __name__ == "__main__":
     tester = WeightGainAppTester()
-    passed, total, results = tester.run_smart_coaching_tests()
+    
+    # Run JWT Authentication tests as requested
+    print("🔐 TESTING JWT AUTHENTICATION SYSTEM FOR WEIGHT GAIN APP")
+    print("=" * 80)
+    
+    passed, total, results = tester.run_jwt_authentication_tests()
     
     # Save detailed results
-    with open("/app/smart_coaching_test_results.json", "w") as f:
+    with open("/app/jwt_auth_test_results.json", "w") as f:
         json.dump({
             "summary": {"passed": passed, "total": total, "success_rate": f"{(passed/total)*100:.1f}%"},
             "results": results,
             "backend_url": BACKEND_URL,
             "test_timestamp": datetime.now().isoformat(),
-            "test_focus": "Smart Coaching System - Phase 3"
+            "test_focus": "JWT Authentication System"
         }, f, indent=2)
     
-    print(f"\n📝 Detailed results saved to smart_coaching_test_results.json")
+    print(f"\n📝 Detailed results saved to jwt_auth_test_results.json")
+    
+    # Also run a subset of smart coaching tests to verify integration
+    print(f"\n\n🧠 Running Integration Tests with Smart Coaching System")
+    print("=" * 80)
+    
+    # Reset test results for coaching tests
+    tester.test_results = []
+    
+    # Run key coaching tests to verify they work with authentication
+    coaching_integration_tests = [
+        tester.test_user_creation_with_coaching_welcome_tip,
+        tester.test_coaching_tips_retrieval_and_filtering,
+        tester.test_smart_meal_suggestions,
+        tester.test_enhanced_food_logging_with_coaching_tips,
+        tester.test_enhanced_daily_stats_with_coaching_tips,
+    ]
+    
+    coaching_passed = 0
+    coaching_total = len(coaching_integration_tests)
+    
+    for test in coaching_integration_tests:
+        if test():
+            coaching_passed += 1
+        time.sleep(1)
+    
+    print(f"\n🎯 Coaching Integration Test Results: {coaching_passed}/{coaching_total} tests passed")
+    
+    # Overall summary
+    overall_passed = passed + coaching_passed
+    overall_total = total + coaching_total
+    
+    print(f"\n" + "=" * 80)
+    print(f"🏆 OVERALL TEST RESULTS: {overall_passed}/{overall_total} tests passed ({(overall_passed/overall_total)*100:.1f}%)")
+    print(f"🔐 JWT Authentication: {passed}/{total} passed")
+    print(f"🧠 Coaching Integration: {coaching_passed}/{coaching_total} passed")
+    
+    if overall_passed == overall_total:
+        print(f"\n🎉 ALL TESTS PASSED! JWT Authentication system is working perfectly!")
+    else:
+        print(f"\n⚠️  Some tests failed. Check the detailed results above.")
