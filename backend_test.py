@@ -1182,13 +1182,16 @@ class WeightGainAppTester:
 
     def test_coaching_tips_retrieval_and_filtering(self):
         """Test GET /api/coaching/tips/{user_id} with filtering"""
-        if not self.test_user_id:
-            self.log_test("Coaching Tips Retrieval and Filtering", False, "No test user ID available")
+        if not self.test_user_id or not self.auth_token:
+            self.log_test("Coaching Tips Retrieval and Filtering", False, "No test user ID or auth token available")
             return False
         
         try:
+            headers = {"Authorization": f"Bearer {self.auth_token}"}
+            
             # Test getting all tips
-            all_tips_response = requests.get(f"{self.base_url}/coaching/tips/{self.test_user_id}", timeout=10)
+            all_tips_response = requests.get(f"{self.base_url}/coaching/tips/{self.test_user_id}", 
+                                           headers=headers, timeout=10)
             if all_tips_response.status_code != 200:
                 self.log_test("Coaching Tips Retrieval and Filtering", False, 
                             f"Failed to get all tips: {all_tips_response.status_code}")
@@ -1197,7 +1200,8 @@ class WeightGainAppTester:
             all_tips = all_tips_response.json()
             
             # Test getting unread tips only
-            unread_tips_response = requests.get(f"{self.base_url}/coaching/tips/{self.test_user_id}?unread_only=true", timeout=10)
+            unread_tips_response = requests.get(f"{self.base_url}/coaching/tips/{self.test_user_id}?unread_only=true", 
+                                               headers=headers, timeout=10)
             if unread_tips_response.status_code != 200:
                 self.log_test("Coaching Tips Retrieval and Filtering", False, 
                             f"Failed to get unread tips: {unread_tips_response.status_code}")
