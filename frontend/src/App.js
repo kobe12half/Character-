@@ -199,6 +199,7 @@ function App() {
       }
 
       console.log('Dashboard data loading completed');
+      setLoading(false); // Clear loading state after successful data loading
       
     } catch (error) {
       console.error('Error loading dashboard data:', error);
@@ -233,6 +234,7 @@ function App() {
       });
       
       setError('Some dashboard data could not be loaded, but you can still use the app.');
+      setLoading(false); // Clear loading state even if there are errors
     }
   };
 
