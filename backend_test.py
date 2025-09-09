@@ -1122,8 +1122,10 @@ class WeightGainAppTester:
     # ========== SMART COACHING SYSTEM TESTS (Phase 3) ==========
     
     def test_user_creation_with_coaching_welcome_tip(self):
-        """Test POST /api/users creates welcome coaching tip"""
+        """Test POST /api/auth/register creates welcome coaching tip"""
         user_data = {
+            "email": "marcus.johnson@example.com",
+            "password": "SecurePass789!",
             "name": "Marcus Johnson",
             "age": 24,
             "height_cm": 180.0,
@@ -1135,16 +1137,24 @@ class WeightGainAppTester:
         }
         
         try:
-            response = requests.post(f"{self.base_url}/users", json=user_data, timeout=10)
+            response = requests.post(f"{self.base_url}/auth/register", json=user_data, timeout=10)
             if response.status_code == 200:
                 data = response.json()
-                coaching_user_id = data.get("user_id")
+                coaching_user_id = data.get("user", {}).get("user_id")
+                coaching_token = data.get("access_token")
+                
+                if not coaching_user_id or not coaching_token:
+                    self.log_test("User Creation with Coaching Welcome Tip", False, 
+                                "Missing user ID or token in registration response")
+                    return False
                 
                 # Wait a moment for coaching tip to be created
                 time.sleep(2)
                 
                 # Check if welcome coaching tip was created
-                tips_response = requests.get(f"{self.base_url}/coaching/tips/{coaching_user_id}?unread_only=true", timeout=10)
+                headers = {"Authorization": f"Bearer {coaching_token}"}
+                tips_response = requests.get(f"{self.base_url}/coaching/tips/{coaching_user_id}?unread_only=true", 
+                                           headers=headers, timeout=10)
                 if tips_response.status_code == 200:
                     tips = tips_response.json()
                     
