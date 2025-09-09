@@ -2,15 +2,19 @@ import os
 import uuid
 import base64
 import asyncio
+import hashlib
+import secrets
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from pydantic import BaseModel, EmailStr
 from motor.motor_asyncio import AsyncIOMotorClient
 from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
 import json
 import random
+import jwt
 
 app = FastAPI()
 
@@ -31,9 +35,42 @@ db = client.weight_gain_app
 # Emergent LLM key
 EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', 'sk-emergent-41dE6724c7d2d54166')
 
+# JWT settings
+JWT_SECRET = os.environ.get('JWT_SECRET', 'your-super-secret-jwt-key-change-in-production')
+JWT_ALGORITHM = "HS256"
+JWT_EXPIRATION_HOURS = 24 * 7  # 7 days
+
+# Security
+security = HTTPBearer()
+
 # Pydantic models
+class UserRegistration(BaseModel):
+    email: EmailStr
+    password: str
+    name: str
+    age: int
+    height_cm: float
+    weight_kg: float
+    gender: str  # 'male' or 'female'
+    activity_level: str  # 'sedentary', 'light', 'moderate', 'active', 'very_active'
+    goal_weight_kg: float
+    target_weekly_gain: float  # 0.25, 0.5, or 1.0 kg per week
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+class PasswordReset(BaseModel):
+    email: EmailStr
+
+class PasswordResetConfirm(BaseModel):
+    reset_token: str
+    new_password: str
+
 class User(BaseModel):
     user_id: str
+    email: str
+    password_hash: str
     name: str
     age: int
     height_cm: float
@@ -47,6 +84,10 @@ class User(BaseModel):
     daily_carb_target: int
     daily_fat_target: int
     created_date: str
+    last_login: Optional[str] = None
+    is_active: bool = True
+    reset_token: Optional[str] = None
+    reset_token_expires: Optional[str] = None
     # Gamification fields
     total_points: int = 0
     current_streak: int = 0
@@ -189,6 +230,59 @@ class UserStats(BaseModel):
     challenge_points: int = 0
     active_challenges_count: int = 0
     completed_challenges_count: int = 0
+
+# Authentication helper functions
+def hash_password(password: str) -> str:
+    """Hash password using SHA-256"""
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def verify_password(password: str, hashed: str) -> bool:
+    """Verify password against hash"""
+    return hash_password(password) == hashed
+
+def create_access_token(user_id: str) -> str:
+    """Create JWT access token"""
+    payload = {
+        "user_id": user_id,
+        "exp": datetime.utcnow() + timedelta(hours=JWT_EXPIRATION_HOURS),
+        "iat": datetime.utcnow()
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+def verify_token(token: str) -> Optional[str]:
+    """Verify JWT token and return user_id"""
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        return payload.get("user_id")
+    except jwt.ExpiredSignatureError:
+        return None
+    except jwt.InvalidTokenError:
+        return None
+
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
+    """Get current user from JWT token"""
+    user_id = verify_token(credentials.credentials)
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # Verify user exists and is active
+    user = await db.users.find_one({"user_id": user_id, "is_active": True}, {"_id": 0})
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found or inactive",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    return user_id
+
+def generate_reset_token() -> str:
+    """Generate secure reset token"""
+    return secrets.token_urlsafe(32)
 
 # Badge definitions
 BADGES = {
@@ -998,49 +1092,60 @@ async def analyze_food_image(image_base64: str) -> dict:
             "confidence": "low"
         }
 
-# API Routes
-@app.get("/api/health")
-async def health_check():
-    return {"status": "healthy", "message": "Weight Gain App API with Challenges & Entertainment is running"}
-
-@app.post("/api/users")
-async def create_user(user_data: dict):
-    """Create new user profile with coaching initialization and starter challenges"""
+# Authentication API Routes
+@app.post("/api/auth/register")
+async def register_user(user_data: UserRegistration):
+    """Register new user with email and password"""
     try:
+        # Check if user already exists
+        existing_user = await db.users.find_one({"email": user_data.email})
+        if existing_user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User with this email already exists"
+            )
+        
         user_id = str(uuid.uuid4())
         
         # Calculate TDEE and surplus for weight gain
         tdee = calculate_tdee(
-            user_data['age'], 
-            user_data['height_cm'], 
-            user_data['weight_kg'], 
-            user_data['gender'], 
-            user_data['activity_level']
+            user_data.age, 
+            user_data.height_cm, 
+            user_data.weight_kg, 
+            user_data.gender, 
+            user_data.activity_level
         )
         
         # Add caloric surplus based on target weekly gain
         surplus_map = {0.25: 250, 0.5: 500, 1.0: 750}  # kcal/day
-        surplus = surplus_map.get(user_data['target_weekly_gain'], 500)
+        surplus = surplus_map.get(user_data.target_weekly_gain, 500)
         daily_calorie_target = tdee + surplus
         
         # Calculate macro targets
         protein_target, carb_target, fat_target = calculate_macro_targets(daily_calorie_target)
         
+        # Hash password
+        password_hash = hash_password(user_data.password)
+        
         user = User(
             user_id=user_id,
-            name=user_data['name'],
-            age=user_data['age'],
-            height_cm=user_data['height_cm'],
-            weight_kg=user_data['weight_kg'],
-            gender=user_data['gender'],
-            activity_level=user_data['activity_level'],
-            goal_weight_kg=user_data['goal_weight_kg'],
-            target_weekly_gain=user_data['target_weekly_gain'],
+            email=user_data.email,
+            password_hash=password_hash,
+            name=user_data.name,
+            age=user_data.age,
+            height_cm=user_data.height_cm,
+            weight_kg=user_data.weight_kg,
+            gender=user_data.gender,
+            activity_level=user_data.activity_level,
+            goal_weight_kg=user_data.goal_weight_kg,
+            target_weekly_gain=user_data.target_weekly_gain,
             daily_calorie_target=daily_calorie_target,
             daily_protein_target=protein_target,
             daily_carb_target=carb_target,
             daily_fat_target=fat_target,
             created_date=datetime.now().isoformat(),
+            last_login=datetime.now().isoformat(),
+            is_active=True,
             total_points=0,
             current_streak=0,
             longest_streak=0,
@@ -1058,10 +1163,13 @@ async def create_user(user_data: dict):
         
         await db.users.insert_one(user.dict())
         
+        # Create access token
+        access_token = create_access_token(user_id)
+        
         # Create welcome coaching tip
         await create_coaching_tip(
             user_id, "motivation", "Welcome to Your Journey!",
-            f"Welcome {user_data['name']}! 🎉 Your daily calorie target is {daily_calorie_target}. Start by logging your first meal and take on some challenges to earn bonus points!",
+            f"Welcome {user_data.name}! 🎉 Your daily calorie target is {daily_calorie_target}. Start by logging your first meal and take on some challenges to earn bonus points!",
             "high", {"onboarding": True}, expires_hours=72
         )
         
@@ -1072,22 +1180,196 @@ async def create_user(user_data: dict):
             await db.challenges.insert_one(challenge.dict())
             await assign_challenge_to_user(user_id, challenge)
         
-        return {"user_id": user_id, "user": user.dict()}
+        # Return user data without password hash
+        user_response = user.dict()
+        del user_response['password_hash']
+        del user_response['reset_token']
+        del user_response['reset_token_expires']
+        
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "user": user_response
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/auth/login")
+async def login_user(login_data: UserLogin):
+    """Login user with email and password"""
+    try:
+        # Find user by email
+        user = await db.users.find_one({"email": login_data.email, "is_active": True})
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid email or password"
+            )
+        
+        # Verify password
+        if not verify_password(login_data.password, user['password_hash']):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid email or password"
+            )
+        
+        # Update last login
+        await db.users.update_one(
+            {"user_id": user['user_id']},
+            {"$set": {"last_login": datetime.now().isoformat()}}
+        )
+        
+        # Create access token
+        access_token = create_access_token(user['user_id'])
+        
+        # Return user data without password hash
+        user_response = user.copy()
+        del user_response['password_hash']
+        del user_response['reset_token']
+        del user_response['reset_token_expires']
+        del user_response['_id']
+        
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "user": user_response
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/auth/forgot-password")
+async def forgot_password(reset_data: PasswordReset):
+    """Request password reset"""
+    try:
+        # Find user by email
+        user = await db.users.find_one({"email": reset_data.email, "is_active": True})
+        if not user:
+            # Return success even if user not found (security best practice)
+            return {"message": "If an account with that email exists, a password reset link has been sent."}
+        
+        # Generate reset token
+        reset_token = generate_reset_token()
+        reset_expires = (datetime.now() + timedelta(hours=1)).isoformat()  # 1 hour expiry
+        
+        # Save reset token to user
+        await db.users.update_one(
+            {"user_id": user['user_id']},
+            {"$set": {
+                "reset_token": reset_token,
+                "reset_token_expires": reset_expires
+            }}
+        )
+        
+        # In a real app, you would send an email here
+        # For now, we'll return the token (NOT recommended for production)
+        return {
+            "message": "Password reset token generated",
+            "reset_token": reset_token  # REMOVE THIS IN PRODUCTION!
+        }
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/users/{user_id}")
-async def get_user(user_id: str):
-    """Get user profile"""
-    user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+@app.post("/api/auth/reset-password")
+async def reset_password(reset_data: PasswordResetConfirm):
+    """Reset password with token"""
+    try:
+        # Find user with valid reset token
+        current_time = datetime.now().isoformat()
+        user = await db.users.find_one({
+            "reset_token": reset_data.reset_token,
+            "reset_token_expires": {"$gt": current_time},
+            "is_active": True
+        })
+        
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid or expired reset token"
+            )
+        
+        # Hash new password
+        new_password_hash = hash_password(reset_data.new_password)
+        
+        # Update password and clear reset token
+        await db.users.update_one(
+            {"user_id": user['user_id']},
+            {"$set": {
+                "password_hash": new_password_hash
+            },
+            "$unset": {
+                "reset_token": "",
+                "reset_token_expires": ""
+            }}
+        )
+        
+        return {"message": "Password reset successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/auth/me")
+async def get_current_user_profile(current_user_id: str = Depends(get_current_user)):
+    """Get current user profile"""
+    user = await db.users.find_one({"user_id": current_user_id}, {"_id": 0})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    return user
+    
+    # Remove sensitive fields
+    user_response = user.copy()
+    del user_response['password_hash']
+    if 'reset_token' in user_response:
+        del user_response['reset_token']
+    if 'reset_token_expires' in user_response:
+        del user_response['reset_token_expires']
+    
+    return user_response
+
+# API Routes
+@app.get("/api/health")
+async def health_check():
+    return {"status": "healthy", "message": "Weight Gain App API with Authentication is running"}
+
+@app.get("/api/users/{user_id}")
+async def get_user(user_id: str, current_user_id: str = Depends(get_current_user)):
+    """Get user profile (protected)"""
+    # Users can only access their own profile
+    if user_id != current_user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    user = await db.users.find_one({"user_id": user_id, "is_active": True}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Remove sensitive fields
+    user_response = user.copy()
+    del user_response['password_hash']
+    if 'reset_token' in user_response:
+        del user_response['reset_token']
+    if 'reset_token_expires' in user_response:
+        del user_response['reset_token_expires']
+    
+    return user_response
 
 @app.post("/api/analyze-food")
-async def analyze_food(file: UploadFile = File(...), user_id: str = Form(...)):
-    """Analyze food image and return nutritional information"""
+async def analyze_food(
+    file: UploadFile = File(...), 
+    user_id: str = Form(...),
+    current_user_id: str = Depends(get_current_user)
+):
+    """Analyze food image and return nutritional information (protected)"""
+    # Users can only analyze food for their own account
+    if user_id != current_user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
     try:
         # Read and encode image
         image_data = await file.read()
@@ -1105,8 +1387,12 @@ async def analyze_food(file: UploadFile = File(...), user_id: str = Form(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/food-logs")
-async def create_food_log(log_data: dict):
-    """Create new food log entry with gamification, coaching, and challenges"""
+async def create_food_log(log_data: dict, current_user_id: str = Depends(get_current_user)):
+    """Create new food log entry with gamification, coaching, and challenges (protected)"""
+    # Users can only create logs for their own account
+    if log_data.get('user_id') != current_user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
     try:
         log_id = str(uuid.uuid4())
         
@@ -1117,7 +1403,7 @@ async def create_food_log(log_data: dict):
         total_fat = sum(food['fat'] for food in log_data['food_items'])
         
         # Get user data for points calculation
-        user = await db.users.find_one({"user_id": log_data['user_id']}, {"_id": 0})
+        user = await db.users.find_one({"user_id": log_data['user_id'], "is_active": True}, {"_id": 0})
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
         
@@ -1203,12 +1489,22 @@ async def create_food_log(log_data: dict):
             "completed_challenges": completed_challenges
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/food-logs/{user_id}")
-async def get_food_logs(user_id: str, date: Optional[str] = None):
-    """Get food logs for user, optionally filtered by date"""
+async def get_food_logs(
+    user_id: str, 
+    current_user_id: str = Depends(get_current_user),
+    date: Optional[str] = None
+):
+    """Get food logs for user, optionally filtered by date (protected)"""
+    # Users can only access their own logs
+    if user_id != current_user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
     query = {"user_id": user_id}
     if date:
         query["date"] = date
@@ -1217,8 +1513,12 @@ async def get_food_logs(user_id: str, date: Optional[str] = None):
     return logs
 
 @app.post("/api/weight-entries")
-async def create_weight_entry(weight_data: dict):
-    """Create new weight entry with gamification, coaching, and challenges"""
+async def create_weight_entry(weight_data: dict, current_user_id: str = Depends(get_current_user)):
+    """Create new weight entry with gamification, coaching, and challenges (protected)"""
+    # Users can only create entries for their own account
+    if weight_data.get('user_id') != current_user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
     try:
         entry_id = str(uuid.uuid4())
         
@@ -1262,6 +1562,8 @@ async def create_weight_entry(weight_data: dict):
             "badge_points": badge_points if 'badge_points' in locals() else 0
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -1303,17 +1605,29 @@ async def generate_weight_progress_tip(user_id: str, current_weight: float):
         print(f"Error generating weight progress tip: {e}")
 
 @app.get("/api/weight-entries/{user_id}")
-async def get_weight_entries(user_id: str):
-    """Get weight entries for user"""
+async def get_weight_entries(user_id: str, current_user_id: str = Depends(get_current_user)):
+    """Get weight entries for user (protected)"""
+    # Users can only access their own entries
+    if user_id != current_user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
     entries = await db.weight_entries.find({"user_id": user_id}, {"_id": 0}).sort("date", -1).to_list(100)
     return entries
 
 @app.get("/api/daily-stats/{user_id}/{date}")
-async def get_daily_stats(user_id: str, date: str):
-    """Get daily nutrition stats for user with gamification, coaching and challenge data"""
+async def get_daily_stats(
+    user_id: str, 
+    date: str, 
+    current_user_id: str = Depends(get_current_user)
+):
+    """Get daily nutrition stats for user with gamification, coaching and challenge data (protected)"""
+    # Users can only access their own stats
+    if user_id != current_user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
     try:
         # Get user targets
-        user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+        user = await db.users.find_one({"user_id": user_id, "is_active": True}, {"_id": 0})
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
         
@@ -1371,15 +1685,21 @@ async def get_daily_stats(user_id: str, date: str):
         
         return stats.dict()
         
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/user-stats/{user_id}")
-async def get_user_stats(user_id: str):
-    """Get comprehensive user statistics and achievements"""
+async def get_user_stats(user_id: str, current_user_id: str = Depends(get_current_user)):
+    """Get comprehensive user statistics and achievements (protected)"""
+    # Users can only access their own stats
+    if user_id != current_user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
     try:
         # Get user data
-        user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+        user = await db.users.find_one({"user_id": user_id, "is_active": True}, {"_id": 0})
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
         
@@ -1438,12 +1758,18 @@ async def get_user_stats(user_id: str):
         
         return stats.dict()
         
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/achievements/{user_id}")
-async def get_user_achievements(user_id: str):
-    """Get all achievements for a user"""
+async def get_user_achievements(user_id: str, current_user_id: str = Depends(get_current_user)):
+    """Get all achievements for a user (protected)"""
+    # Users can only access their own achievements
+    if user_id != current_user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
     achievements = await db.achievements.find({"user_id": user_id}, {"_id": 0}).sort("earned_date", -1).to_list(100)
     
     # Add badge info to achievements
@@ -1463,9 +1789,9 @@ async def get_all_badges():
 async def get_leaderboard(limit: int = 10):
     """Get top users by points (for future social features)"""
     try:
-        # Get top users by total points
+        # Get top users by total points (anonymous for privacy)
         users = await db.users.find(
-            {}, 
+            {"is_active": True}, 
             {"_id": 0, "name": 1, "total_points": 1, "current_streak": 1, "badges_earned": 1, "challenge_points": 1}
         ).sort("total_points", -1).limit(limit).to_list(limit)
         
@@ -1477,15 +1803,26 @@ async def get_leaderboard(limit: int = 10):
             user['badges_earned'] = user.get('badges_earned', [])
             user['badge_count'] = len(user['badges_earned'])
             user['challenge_points'] = user.get('challenge_points', 0)
+            # Anonymize names for privacy
+            user['name'] = f"User #{i+1}"
         
         return users
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# Coaching API Endpoints
+# Coaching API Endpoints (all protected)
 @app.get("/api/coaching/tips/{user_id}")
-async def get_coaching_tips(user_id: str, limit: int = 20, unread_only: bool = False):
-    """Get coaching tips for user"""
+async def get_coaching_tips(
+    user_id: str, 
+    current_user_id: str = Depends(get_current_user),
+    limit: int = 20, 
+    unread_only: bool = False
+):
+    """Get coaching tips for user (protected)"""
+    # Users can only access their own tips
+    if user_id != current_user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
     try:
         query = {"user_id": user_id}
         if unread_only:
@@ -1504,23 +1841,34 @@ async def get_coaching_tips(user_id: str, limit: int = 20, unread_only: bool = F
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/coaching/tips/{tip_id}/read")
-async def mark_tip_as_read(tip_id: str):
-    """Mark a coaching tip as read"""
+async def mark_tip_as_read(tip_id: str, current_user_id: str = Depends(get_current_user)):
+    """Mark a coaching tip as read (protected)"""
     try:
+        # Verify tip belongs to current user
+        tip = await db.coaching_tips.find_one({"tip_id": tip_id, "user_id": current_user_id})
+        if not tip:
+            raise HTTPException(status_code=404, detail="Tip not found")
+        
         result = await db.coaching_tips.update_one(
-            {"tip_id": tip_id},
+            {"tip_id": tip_id, "user_id": current_user_id},
             {"$set": {"is_read": True}}
         )
         if result.modified_count > 0:
             return {"success": True}
         else:
             raise HTTPException(status_code=404, detail="Tip not found")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/coaching/generate-tips/{user_id}")
-async def generate_tips_manual(user_id: str):
-    """Manually trigger coaching tip generation"""
+async def generate_tips_manual(user_id: str, current_user_id: str = Depends(get_current_user)):
+    """Manually trigger coaching tip generation (protected)"""
+    # Users can only generate tips for their own account
+    if user_id != current_user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
     try:
         await generate_contextual_tips(user_id, {"trigger": "manual"})
         return {"success": True, "message": "Coaching tips generated"}
@@ -1528,10 +1876,18 @@ async def generate_tips_manual(user_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/coaching/meal-suggestions/{user_id}")
-async def get_meal_suggestions(user_id: str, meal_type: str = "any"):
-    """Get personalized meal suggestions"""
+async def get_meal_suggestions(
+    user_id: str, 
+    current_user_id: str = Depends(get_current_user),
+    meal_type: str = "any"
+):
+    """Get personalized meal suggestions (protected)"""
+    # Users can only get suggestions for their own account
+    if user_id != current_user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
     try:
-        user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+        user = await db.users.find_one({"user_id": user_id, "is_active": True}, {"_id": 0})
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
         
@@ -1566,14 +1922,20 @@ async def get_meal_suggestions(user_id: str, meal_type: str = "any"):
                 "protein_needed": max(0, daily_stats['protein_target'] - daily_stats['total_protein']) if daily_stats else user['daily_protein_target']
             }
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/coaching/weekly-checkin/{user_id}")
-async def perform_weekly_checkin(user_id: str):
-    """Perform weekly check-in and TDEE adjustment"""
+async def perform_weekly_checkin(user_id: str, current_user_id: str = Depends(get_current_user)):
+    """Perform weekly check-in and TDEE adjustment (protected)"""
+    # Users can only perform check-ins for their own account
+    if user_id != current_user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
     try:
-        user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+        user = await db.users.find_one({"user_id": user_id, "is_active": True}, {"_id": 0})
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
         
@@ -1682,12 +2044,22 @@ async def perform_weekly_checkin(user_id: str):
             "new_target": user['daily_calorie_target'] + tdee_adjustment
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/coaching/weekly-checkins/{user_id}")
-async def get_weekly_checkins(user_id: str, limit: int = 10):
-    """Get weekly check-in history"""
+async def get_weekly_checkins(
+    user_id: str, 
+    current_user_id: str = Depends(get_current_user),
+    limit: int = 10
+):
+    """Get weekly check-in history (protected)"""
+    # Users can only access their own check-ins
+    if user_id != current_user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
     try:
         checkins = await db.weekly_checkins.find(
             {"user_id": user_id}, {"_id": 0}
@@ -1696,15 +2068,19 @@ async def get_weekly_checkins(user_id: str, limit: int = 10):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# Challenge API Endpoints
+# Challenge API Endpoints (all protected)
 @app.get("/api/challenges")
 async def get_available_challenges():
     """Get all available challenge templates"""
     return CHALLENGE_TEMPLATES
 
 @app.get("/api/challenges/active/{user_id}")
-async def get_active_challenges(user_id: str):
-    """Get active challenges for user with progress"""
+async def get_active_challenges(user_id: str, current_user_id: str = Depends(get_current_user)):
+    """Get active challenges for user with progress (protected)"""
+    # Users can only access their own challenges
+    if user_id != current_user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
     try:
         # Get active user challenges
         user_challenges = await db.user_challenges.find({
@@ -1734,8 +2110,16 @@ async def get_active_challenges(user_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/challenges/completed/{user_id}")
-async def get_completed_challenges(user_id: str, limit: int = 20):
-    """Get completed challenges for user"""
+async def get_completed_challenges(
+    user_id: str, 
+    current_user_id: str = Depends(get_current_user),
+    limit: int = 20
+):
+    """Get completed challenges for user (protected)"""
+    # Users can only access their own challenges
+    if user_id != current_user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
     try:
         completed_challenges = await db.user_challenges.find({
             "user_id": user_id,
@@ -1755,18 +2139,20 @@ async def get_completed_challenges(user_id: str, limit: int = 20):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/challenges/join/{user_id}")
-async def join_challenge(user_id: str, challenge_data: dict):
-    """Join a new challenge"""
+async def join_challenge(
+    user_id: str, 
+    challenge_data: dict, 
+    current_user_id: str = Depends(get_current_user)
+):
+    """Join a new challenge (protected)"""
+    # Users can only join challenges for their own account
+    if user_id != current_user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
     try:
         challenge_template = challenge_data.get('challenge_template')
         if not challenge_template or challenge_template not in CHALLENGE_TEMPLATES:
             raise HTTPException(status_code=400, detail="Invalid challenge template")
-        
-        # Check if user already has this challenge active
-        existing = await db.user_challenges.find_one({
-            "user_id": user_id,
-            "is_completed": False
-        })
         
         # Create new challenge
         challenge = await create_challenge(challenge_template)
@@ -1787,12 +2173,18 @@ async def join_challenge(user_id: str, challenge_data: dict):
             "challenge": challenge.dict(),
             "user_challenge": user_challenge.dict()
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/challenges/create-random/{user_id}")
-async def create_random_challenges(user_id: str):
-    """Create 2-3 random challenges for user"""
+async def create_random_challenges(user_id: str, current_user_id: str = Depends(get_current_user)):
+    """Create 2-3 random challenges for user (protected)"""
+    # Users can only create challenges for their own account
+    if user_id != current_user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
     try:
         # Select 2-3 random challenge templates
         available_templates = list(CHALLENGE_TEMPLATES.keys())
@@ -1820,6 +2212,8 @@ async def create_random_challenges(user_id: str):
             "challenges_created": len(created_challenges),
             "challenges": created_challenges
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
