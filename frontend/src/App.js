@@ -45,7 +45,7 @@ function App() {
         setToken(savedToken);
         setUser(JSON.parse(savedUser));
         setCurrentView('dashboard');
-        loadDashboardData(JSON.parse(savedUser).user_id);
+        loadDashboardData(JSON.parse(savedUser).user_id, savedToken);
       } catch (error) {
         // Clear corrupted data
         localStorage.removeItem('weightGainToken');
