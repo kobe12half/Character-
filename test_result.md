@@ -569,13 +569,16 @@ frontend:
     implemented: true
     working: false
     file: "/app/frontend/src/App.js"
-    stuck_count: 1
+    stuck_count: 2
     priority: "high"
     needs_retesting: false
     status_history:
         - working: false
           agent: "testing"
           comment: "❌ CRITICAL ISSUE: Login form accepts credentials correctly, but same dashboard loading issue occurs after successful login. Even with valid JWT token and user data in localStorage, the dashboard fails to load properly and remains stuck on 'Loading dashboard...' message."
+        - working: false
+          agent: "testing"
+          comment: "❌ CRITICAL BUG CONFIRMED: Same root cause as registration - loadDashboardData function not executing after login. This affects both new user registration AND existing user login, making the entire app unusable after authentication."
 
   - task: "JWT Authentication System - Logout Functionality"
     implemented: true
