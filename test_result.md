@@ -822,15 +822,16 @@ metadata:
 
 test_plan:
   current_focus:
-    - "JWT User Registration System"
-    - "JWT User Login System"
-    - "JWT Password Reset Flow"
-    - "JWT Token Validation and Security"
-    - "Protected Endpoints Authentication"
-    - "Authentication Integration with Existing Features"
-  stuck_tasks: []
-  test_all: true
-  test_priority: "completed"
+    - "JWT Authentication System - User Registration"
+    - "JWT Authentication System - User Login"
+    - "JWT Authentication System - Data Persistence"
+    - "JWT Authentication System - Logout Functionality"
+  stuck_tasks:
+    - "JWT Authentication System - User Registration"
+    - "JWT Authentication System - User Login"
+    - "JWT Authentication System - Data Persistence"
+  test_all: false
+  test_priority: "stuck_first"
 
 agent_communication:
     - agent: "testing"
