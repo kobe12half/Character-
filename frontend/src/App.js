@@ -586,7 +586,7 @@ function App() {
         setCapturedImage(null);
         setNutritionData(null);
         setCurrentView('dashboard');
-        await loadDashboardData(user.user_id);
+        await loadDashboardData(user.user_id, token);
       } else if (handleAuthError(response)) {
         return;
       } else {
