@@ -16,7 +16,7 @@ from datetime import datetime, timedelta
 import time
 
 # Get backend URL from frontend env
-BACKEND_URL = "https://gain-weight-guide.preview.emergentagent.com/api"
+BACKEND_URL = "https://nutriboost-6.preview.emergentagent.com/api"
 
 class CriticalBugTester:
     def __init__(self):

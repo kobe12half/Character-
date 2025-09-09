@@ -8,7 +8,7 @@ import requests
 import json
 from datetime import datetime
 
-BACKEND_URL = "https://gain-weight-guide.preview.emergentagent.com/api"
+BACKEND_URL = "https://nutriboost-6.preview.emergentagent.com/api"
 
 def test_invalid_user_id():
     """Test GET endpoints with invalid user ID"""
