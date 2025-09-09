@@ -444,7 +444,7 @@ function App() {
         const result = await response.json();
         showNotification(`${result.challenges_created} new challenges created! 🎯`);
         showCelebration('challenges', { count: result.challenges_created });
-        await loadDashboardData(user.user_id);
+        await loadDashboardData(user.user_id, token);
       } else if (handleAuthError(response)) {
         return;
       }
