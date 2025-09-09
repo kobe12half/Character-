@@ -554,13 +554,16 @@ frontend:
     implemented: true
     working: false
     file: "/app/frontend/src/App.js"
-    stuck_count: 1
+    stuck_count: 2
     priority: "high"
     needs_retesting: false
     status_history:
         - working: false
           agent: "testing"
           comment: "❌ CRITICAL ISSUE: Registration form works correctly and accepts realistic data (name, age, height, weight, goals, activity level). Backend registration API returns 200 success and JWT token is properly stored in localStorage. However, after successful registration, the app gets stuck on 'Loading dashboard...' and never loads the dashboard. The loadDashboardData function appears to only make calls to /api/badges but not to other required endpoints like /api/daily-stats, /api/user-stats, etc. This prevents users from accessing the app after registration."
+        - working: false
+          agent: "testing"
+          comment: "❌ CRITICAL BUG CONFIRMED STILL EXISTS: Comprehensive testing shows the 'Loading dashboard...' bug has NOT been fixed. ROOT CAUSE IDENTIFIED: The loadDashboardData function is NOT being called at all after successful registration. Registration API succeeds (200 response), JWT token and user data are properly stored in localStorage (token length: 193, user_id extracted correctly), but ZERO dashboard API calls are made. Expected 9 API calls (/api/daily-stats, /api/user-stats, /api/food-logs, /api/weight-entries, /api/achievements, /api/coaching/tips, /api/coaching/meal-suggestions, /api/challenges/active, /api/challenges/completed) but only registration call occurs. The handleRegister function calls loadDashboardData but it's not executing. This is a CRITICAL blocking issue preventing all user onboarding."
 
   - task: "JWT Authentication System - User Login"
     implemented: true
