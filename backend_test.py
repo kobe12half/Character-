@@ -1329,12 +1329,14 @@ class WeightGainAppTester:
 
     def test_smart_meal_suggestions(self):
         """Test GET /api/coaching/meal-suggestions/{user_id}"""
-        if not self.test_user_id:
-            self.log_test("Smart Meal Suggestions", False, "No test user ID available")
+        if not self.test_user_id or not self.auth_token:
+            self.log_test("Smart Meal Suggestions", False, "No test user ID or auth token available")
             return False
         
         try:
-            response = requests.get(f"{self.base_url}/coaching/meal-suggestions/{self.test_user_id}", timeout=10)
+            headers = {"Authorization": f"Bearer {self.auth_token}"}
+            response = requests.get(f"{self.base_url}/coaching/meal-suggestions/{self.test_user_id}", 
+                                  headers=headers, timeout=10)
             if response.status_code == 200:
                 data = response.json()
                 
