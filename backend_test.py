@@ -1679,6 +1679,66 @@ class WeightGainAppTester:
             self.log_test("Pattern Analysis System", False, f"Exception: {str(e)}")
             return False
     
+    def run_jwt_authentication_tests(self):
+        """Run comprehensive JWT Authentication System tests"""
+        print(f"\n🔐 Starting Weight Gain App JWT AUTHENTICATION SYSTEM Tests")
+        print(f"Backend URL: {self.base_url}")
+        print("=" * 80)
+        
+        # Test sequence focusing on JWT Authentication
+        auth_tests = [
+            # Core authentication flow
+            self.test_health_check,
+            self.test_user_registration,
+            self.test_user_login,
+            self.test_invalid_login,
+            
+            # Password reset flow
+            self.test_forgot_password,
+            self.test_reset_password,
+            self.test_login_with_new_password,
+            
+            # Token validation and security
+            self.test_protected_endpoint_without_token,
+            self.test_protected_endpoint_with_invalid_token,
+            self.test_protected_endpoint_with_valid_token,
+            self.test_token_expiration_handling,
+            self.test_cross_user_access_prevention,
+            self.test_get_current_user_profile,
+            
+            # Protected endpoints integration
+            self.test_food_logging_requires_auth,
+            self.test_food_logging_with_auth,
+            self.test_daily_stats_requires_auth,
+            self.test_daily_stats_with_auth,
+            
+            # Verify existing features still work with auth
+            self.test_user_creation_with_gamification,
+            self.test_enhanced_food_logging_gamification,
+        ]
+        
+        passed = 0
+        total = len(auth_tests)
+        
+        for test in auth_tests:
+            if test():
+                passed += 1
+            time.sleep(1)  # Small delay between tests
+        
+        print("\n" + "=" * 80)
+        print(f"🎯 JWT Authentication Test Results: {passed}/{total} tests passed")
+        
+        # Summary of failures
+        failures = [r for r in self.test_results if not r["success"]]
+        if failures:
+            print("\n❌ Failed Tests:")
+            for failure in failures:
+                print(f"   • {failure['test']}: {failure['details']}")
+        else:
+            print("\n🎉 All JWT Authentication features working perfectly!")
+        
+        return passed, total, self.test_results
+
     def run_smart_coaching_tests(self):
         """Run comprehensive Smart Coaching System tests (Phase 3)"""
         print(f"\n🧠 Starting Weight Gain App SMART COACHING SYSTEM Tests (Phase 3)")
