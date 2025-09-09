@@ -985,13 +985,14 @@ class WeightGainAppTester:
         try:
             # Try without token
             response = requests.get(f"{self.base_url}/daily-stats/{self.test_user_id}/{today}", timeout=10)
-            if response.status_code == 401:
+            # FastAPI HTTPBearer returns 403 when no Authorization header is provided
+            if response.status_code in [401, 403]:
                 self.log_test("Daily Stats Auth Required", True, 
-                            "Daily stats correctly requires authentication (401)")
+                            f"Daily stats correctly requires authentication ({response.status_code})")
                 return True
             else:
                 self.log_test("Daily Stats Auth Required", False, 
-                            f"Expected 401, got {response.status_code}")
+                            f"Expected 401 or 403, got {response.status_code}")
                 return False
         except Exception as e:
             self.log_test("Daily Stats Auth Required", False, f"Exception: {str(e)}")
