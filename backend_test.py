@@ -1580,14 +1580,16 @@ class WeightGainAppTester:
 
     def test_enhanced_daily_stats_with_coaching_tips(self):
         """Test GET /api/daily-stats/{user_id}/{date} includes coaching tips"""
-        if not self.test_user_id:
-            self.log_test("Enhanced Daily Stats with Coaching Tips", False, "No test user ID available")
+        if not self.test_user_id or not self.auth_token:
+            self.log_test("Enhanced Daily Stats with Coaching Tips", False, "No test user ID or auth token available")
             return False
         
         today = datetime.now().strftime("%Y-%m-%d")
         
         try:
-            response = requests.get(f"{self.base_url}/daily-stats/{self.test_user_id}/{today}", timeout=10)
+            headers = {"Authorization": f"Bearer {self.auth_token}"}
+            response = requests.get(f"{self.base_url}/daily-stats/{self.test_user_id}/{today}", 
+                                  headers=headers, timeout=10)
             if response.status_code == 200:
                 stats = response.json()
                 
