@@ -19,6 +19,9 @@ class WeightGainAppTester:
         self.base_url = BACKEND_URL
         self.test_user_id = None
         self.test_results = []
+        self.auth_token = None
+        self.test_user_email = None
+        self.reset_token = None
         
     def log_test(self, test_name, success, details="", response_data=None):
         """Log test results"""
