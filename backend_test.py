@@ -587,8 +587,10 @@ class WeightGainAppTester:
     
     def test_user_registration(self):
         """Test POST /api/auth/register with valid user data"""
+        # Use timestamp to ensure unique email
+        timestamp = int(time.time())
         user_data = {
-            "email": "alex.johnson@example.com",
+            "email": f"alex.johnson.{timestamp}@example.com",
             "password": "SecurePass123!",
             "name": "Alex Johnson",
             "age": 25,
