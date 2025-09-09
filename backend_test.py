@@ -816,13 +816,14 @@ class WeightGainAppTester:
         try:
             # Try to access user profile without token
             response = requests.get(f"{self.base_url}/users/{self.test_user_id}", timeout=10)
-            if response.status_code == 401:
+            # FastAPI HTTPBearer returns 403 when no Authorization header is provided
+            if response.status_code in [401, 403]:
                 self.log_test("Protected Endpoint Without Token", True, 
-                            "Protected endpoint correctly rejected request without token (401)")
+                            f"Protected endpoint correctly rejected request without token ({response.status_code})")
                 return True
             else:
                 self.log_test("Protected Endpoint Without Token", False, 
-                            f"Expected 401, got {response.status_code}")
+                            f"Expected 401 or 403, got {response.status_code}")
                 return False
         except Exception as e:
             self.log_test("Protected Endpoint Without Token", False, f"Exception: {str(e)}")
