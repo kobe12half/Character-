@@ -273,7 +273,7 @@ function App() {
         localStorage.setItem('weightGainUser', JSON.stringify(result.user));
         
         setCurrentView('dashboard');
-        await loadDashboardData(result.user.user_id);
+        await loadDashboardData(result.user.user_id, result.access_token);
         showNotification('Welcome back! 🎉');
       } else {
         const errorData = await response.json();
