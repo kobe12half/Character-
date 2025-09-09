@@ -94,11 +94,15 @@ function App() {
     }
   };
 
-  const loadDashboardData = async (userId) => {
-    if (!token) return;
+  const loadDashboardData = async (userId, authToken = null) => {
+    const currentToken = authToken || token;
+    if (!currentToken) return;
     
     try {
-      const headers = getAuthHeaders();
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${currentToken}`
+      };
 
       // Helper function to safely load endpoint data
       const safeLoad = async (url, setter, defaultValue = null, dataKey = null) => {
