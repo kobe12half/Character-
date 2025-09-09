@@ -1129,8 +1129,10 @@ class WeightGainAppTester:
     
     def test_user_creation_with_coaching_welcome_tip(self):
         """Test POST /api/auth/register creates welcome coaching tip"""
+        # Use timestamp to ensure unique email
+        timestamp = int(time.time())
         user_data = {
-            "email": "marcus.johnson@example.com",
+            "email": f"marcus.johnson.{timestamp}@example.com",
             "password": "SecurePass789!",
             "name": "Marcus Johnson",
             "age": 24,
