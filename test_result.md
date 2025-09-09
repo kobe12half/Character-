@@ -538,6 +538,78 @@ backend:
           comment: "✅ COMPREHENSIVE TESTING COMPLETED: GET /api/coaching/weekly-checkins/{user_id} working correctly. Returns historical weekly check-in data sorted by week_end_date. Provides complete progress tracking over time with TDEE adjustments and coaching summaries."
 
 frontend:
+  - task: "JWT Authentication System - Login Screen"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/App.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✅ CRITICAL ISSUE RESOLVED: Login screen now displays correctly instead of 'Loading dashboard...' when unauthenticated. Authentication redirect working properly - unauthenticated users are correctly sent to login screen. Login form elements (email, password, sign in button) are visible and accessible. Form validation working correctly."
+
+  - task: "JWT Authentication System - User Registration"
+    implemented: true
+    working: false
+    file: "/app/frontend/src/App.js"
+    stuck_count: 1
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: false
+          agent: "testing"
+          comment: "❌ CRITICAL ISSUE: Registration form works correctly and accepts realistic data (name, age, height, weight, goals, activity level). Backend registration API returns 200 success and JWT token is properly stored in localStorage. However, after successful registration, the app gets stuck on 'Loading dashboard...' and never loads the dashboard. The loadDashboardData function appears to only make calls to /api/badges but not to other required endpoints like /api/daily-stats, /api/user-stats, etc. This prevents users from accessing the app after registration."
+
+  - task: "JWT Authentication System - User Login"
+    implemented: true
+    working: false
+    file: "/app/frontend/src/App.js"
+    stuck_count: 1
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: false
+          agent: "testing"
+          comment: "❌ CRITICAL ISSUE: Login form accepts credentials correctly, but same dashboard loading issue occurs after successful login. Even with valid JWT token and user data in localStorage, the dashboard fails to load properly and remains stuck on 'Loading dashboard...' message."
+
+  - task: "JWT Authentication System - Logout Functionality"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/App.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "testing"
+          comment: "Cannot test logout functionality because dashboard never loads after login/registration. Logout button is not accessible due to dashboard loading issue."
+
+  - task: "JWT Authentication System - Forgot Password"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/App.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✅ Forgot password UI functionality working correctly. Form displays properly, accepts email input, shows success notification 'Password reset instructions sent to your email!'. Back to login navigation working. UI components are functional and user-friendly."
+
+  - task: "JWT Authentication System - Data Persistence"
+    implemented: true
+    working: false
+    file: "/app/frontend/src/App.js"
+    stuck_count: 1
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: false
+          agent: "testing"
+          comment: "❌ CRITICAL ISSUE: JWT token and user data are properly stored in localStorage after registration/login. However, when page is refreshed with valid token and user data, the app still gets stuck on 'Loading dashboard...' instead of loading the dashboard. The authentication state persistence works but dashboard data loading fails."
+
   - task: "Onboarding Process - User Profile Creation"
     implemented: true
     working: true
