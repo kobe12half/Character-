@@ -100,95 +100,139 @@ function App() {
     try {
       const headers = getAuthHeaders();
 
-      // Load daily stats
-      const statsResponse = await fetch(`${BACKEND_URL}/api/daily-stats/${userId}/${today}`, { headers });
-      if (statsResponse.ok) {
-        const stats = await statsResponse.json();
-        setDailyStats(stats);
-        if (stats.coaching_tips) {
-          setCoachingTips(stats.coaching_tips);
+      // Helper function to safely load endpoint data
+      const safeLoad = async (url, setter, defaultValue = null, dataKey = null) => {
+        try {
+          const response = await fetch(url, { headers });
+          if (response.ok) {
+            const data = await response.json();
+            setter(dataKey ? data[dataKey] : data);
+            return true;
+          } else if (handleAuthError(response)) {
+            throw new Error('Authentication error');
+          } else {
+            console.warn(`Failed to load ${url}: ${response.status}`);
+            if (defaultValue !== null) {
+              setter(defaultValue);
+            }
+            return false;
+          }
+        } catch (error) {
+          console.warn(`Error loading ${url}:`, error);
+          if (defaultValue !== null) {
+            setter(defaultValue);
+          }
+          return false;
         }
-        if (stats.active_challenges) {
-          setActiveChallenges(stats.active_challenges);
-        }
-      } else if (handleAuthError(statsResponse)) {
-        return;
+      };
+
+      // Load all data with fallbacks
+      const loadPromises = [
+        safeLoad(`${BACKEND_URL}/api/daily-stats/${userId}/${today}`, (stats) => {
+          setDailyStats(stats);
+          if (stats.coaching_tips) {
+            setCoachingTips(stats.coaching_tips);
+          }
+          if (stats.active_challenges) {
+            setActiveChallenges(stats.active_challenges);
+          }
+        }, {
+          date: today,
+          total_calories: 0,
+          total_protein: 0,
+          total_carbs: 0,
+          total_fat: 0,
+          calorie_target: user?.daily_calorie_target || 2500,
+          protein_target: user?.daily_protein_target || 150,
+          carb_target: user?.daily_carb_target || 250,
+          fat_target: user?.daily_fat_target || 100,
+          points_earned_today: 0,
+          streak_status: false,
+          target_hit_percentage: 0.0,
+          coaching_tips: [],
+          active_challenges: []
+        }),
+
+        safeLoad(`${BACKEND_URL}/api/user-stats/${userId}`, setUserStats, {
+          user_id: userId,
+          total_points: 0,
+          current_streak: 0,
+          longest_streak: 0,
+          badges_earned: [],
+          total_logs: 0,
+          total_weight_entries: 0,
+          days_active: 0,
+          avg_daily_calories: 0,
+          goal_completion_rate: 0,
+          challenge_points: 0,
+          active_challenges_count: 0,
+          completed_challenges_count: 0
+        }),
+
+        safeLoad(`${BACKEND_URL}/api/food-logs/${userId}?date=${today}`, setFoodLogs, []),
+
+        safeLoad(`${BACKEND_URL}/api/weight-entries/${userId}`, setWeightEntries, []),
+
+        safeLoad(`${BACKEND_URL}/api/achievements/${userId}`, setAchievements, []),
+
+        safeLoad(`${BACKEND_URL}/api/coaching/tips/${userId}?unread_only=true`, setCoachingTips, []),
+
+        safeLoad(`${BACKEND_URL}/api/coaching/meal-suggestions/${userId}`, (data) => {
+          setMealSuggestions(data.suggestions || []);
+        }, []),
+
+        safeLoad(`${BACKEND_URL}/api/challenges/active/${userId}`, setActiveChallenges, []),
+
+        safeLoad(`${BACKEND_URL}/api/challenges/completed/${userId}`, setCompletedChallenges, [])
+      ];
+
+      // Wait for all loads to complete (but don't fail if some don't work)
+      const results = await Promise.allSettled(loadPromises);
+      
+      // Check if authentication failed
+      const authFailures = results.filter(result => 
+        result.status === 'rejected' && result.reason?.message === 'Authentication error'
+      );
+      
+      if (authFailures.length > 0) {
+        return; // User will be redirected to login
       }
 
-      // Load user stats
-      const userStatsResponse = await fetch(`${BACKEND_URL}/api/user-stats/${userId}`, { headers });
-      if (userStatsResponse.ok) {
-        const userStatsData = await userStatsResponse.json();
-        setUserStats(userStatsData);
-      } else if (handleAuthError(userStatsResponse)) {
-        return;
-      }
-
-      // Load food logs
-      const logsResponse = await fetch(`${BACKEND_URL}/api/food-logs/${userId}?date=${today}`, { headers });
-      if (logsResponse.ok) {
-        const logs = await logsResponse.json();
-        setFoodLogs(logs);
-      } else if (handleAuthError(logsResponse)) {
-        return;
-      }
-
-      // Load weight entries
-      const weightResponse = await fetch(`${BACKEND_URL}/api/weight-entries/${userId}`, { headers });
-      if (weightResponse.ok) {
-        const entries = await weightResponse.json();
-        setWeightEntries(entries);
-      } else if (handleAuthError(weightResponse)) {
-        return;
-      }
-
-      // Load achievements
-      const achievementsResponse = await fetch(`${BACKEND_URL}/api/achievements/${userId}`, { headers });
-      if (achievementsResponse.ok) {
-        const achievementsData = await achievementsResponse.json();
-        setAchievements(achievementsData);
-      } else if (handleAuthError(achievementsResponse)) {
-        return;
-      }
-
-      // Load coaching tips
-      const coachingResponse = await fetch(`${BACKEND_URL}/api/coaching/tips/${userId}?unread_only=true`, { headers });
-      if (coachingResponse.ok) {
-        const coachingData = await coachingResponse.json();
-        setCoachingTips(coachingData);
-      } else if (handleAuthError(coachingResponse)) {
-        return;
-      }
-
-      // Load meal suggestions
-      const suggestionsResponse = await fetch(`${BACKEND_URL}/api/coaching/meal-suggestions/${userId}`, { headers });
-      if (suggestionsResponse.ok) {
-        const suggestionsData = await suggestionsResponse.json();
-        setMealSuggestions(suggestionsData.suggestions || []);
-      } else if (handleAuthError(suggestionsResponse)) {
-        return;
-      }
-
-      // Load active challenges
-      const challengesResponse = await fetch(`${BACKEND_URL}/api/challenges/active/${userId}`, { headers });
-      if (challengesResponse.ok) {
-        const challengesData = await challengesResponse.json();
-        setActiveChallenges(challengesData);
-      } else if (handleAuthError(challengesResponse)) {
-        return;
-      }
-
-      // Load completed challenges
-      const completedResponse = await fetch(`${BACKEND_URL}/api/challenges/completed/${userId}`, { headers });
-      if (completedResponse.ok) {
-        const completedData = await completedResponse.json();
-        setCompletedChallenges(completedData);
-      } else if (handleAuthError(completedResponse)) {
-        return;
-      }
+      console.log('Dashboard data loading completed');
+      
     } catch (error) {
       console.error('Error loading dashboard data:', error);
-      setError('Failed to load dashboard data. Please try again.');
+      
+      // Set minimal default state so dashboard can still render
+      setDailyStats({
+        date: today,
+        total_calories: 0,
+        total_protein: 0,
+        total_carbs: 0,
+        total_fat: 0,
+        calorie_target: user?.daily_calorie_target || 2500,
+        protein_target: user?.daily_protein_target || 150,
+        carb_target: user?.daily_carb_target || 250,
+        fat_target: user?.daily_fat_target || 100,
+        points_earned_today: 0,
+        streak_status: false,
+        target_hit_percentage: 0.0
+      });
+      
+      setUserStats({
+        user_id: userId,
+        total_points: 0,
+        current_streak: 0,
+        longest_streak: 0,
+        badges_earned: [],
+        total_logs: 0,
+        total_weight_entries: 0,
+        days_active: 0,
+        avg_daily_calories: 0,
+        goal_completion_rate: 0
+      });
+      
+      setError('Some dashboard data could not be loaded, but you can still use the app.');
     }
   };
 
