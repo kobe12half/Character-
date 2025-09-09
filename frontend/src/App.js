@@ -619,7 +619,7 @@ function App() {
         const result = await response.json();
         showNotification(`Weight logged! +${result.points_earned} points 📊`);
         showCelebration('weight', { weight: parseFloat(weight) });
-        await loadDashboardData(user.user_id);
+        await loadDashboardData(user.user_id, token);
       } else if (handleAuthError(response)) {
         return;
       }
