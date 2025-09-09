@@ -1459,13 +1459,16 @@ class WeightGainAppTester:
 
     def test_enhanced_food_logging_with_coaching_tips(self):
         """Test POST /api/food-logs triggers contextual coaching tips"""
-        if not self.test_user_id:
-            self.log_test("Enhanced Food Logging with Coaching Tips", False, "No test user ID available")
+        if not self.test_user_id or not self.auth_token:
+            self.log_test("Enhanced Food Logging with Coaching Tips", False, "No test user ID or auth token available")
             return False
         
         try:
+            headers = {"Authorization": f"Bearer {self.auth_token}"}
+            
             # Get initial tip count
-            before_response = requests.get(f"{self.base_url}/coaching/tips/{self.test_user_id}", timeout=10)
+            before_response = requests.get(f"{self.base_url}/coaching/tips/{self.test_user_id}", 
+                                         headers=headers, timeout=10)
             if before_response.status_code != 200:
                 self.log_test("Enhanced Food Logging with Coaching Tips", False, "Could not get initial tip count")
                 return False
@@ -1491,7 +1494,8 @@ class WeightGainAppTester:
             }
             
             # Log the food
-            log_response = requests.post(f"{self.base_url}/food-logs", json=low_calorie_log, timeout=10)
+            log_response = requests.post(f"{self.base_url}/food-logs", json=low_calorie_log, 
+                                       headers=headers, timeout=10)
             if log_response.status_code != 200:
                 self.log_test("Enhanced Food Logging with Coaching Tips", False, 
                             f"Food logging failed: {log_response.status_code}")
@@ -1501,7 +1505,8 @@ class WeightGainAppTester:
             time.sleep(3)
             
             # Check if new coaching tips were created
-            after_response = requests.get(f"{self.base_url}/coaching/tips/{self.test_user_id}", timeout=10)
+            after_response = requests.get(f"{self.base_url}/coaching/tips/{self.test_user_id}", 
+                                        headers=headers, timeout=10)
             if after_response.status_code == 200:
                 tips_after = len(after_response.json())
                 
