@@ -911,13 +911,14 @@ class WeightGainAppTester:
         try:
             # Try without token
             response = requests.post(f"{self.base_url}/food-logs", json=food_log_data, timeout=10)
-            if response.status_code == 401:
+            # FastAPI HTTPBearer returns 403 when no Authorization header is provided
+            if response.status_code in [401, 403]:
                 self.log_test("Food Logging Auth Required", True, 
-                            "Food logging correctly requires authentication (401)")
+                            f"Food logging correctly requires authentication ({response.status_code})")
                 return True
             else:
                 self.log_test("Food Logging Auth Required", False, 
-                            f"Expected 401, got {response.status_code}")
+                            f"Expected 401 or 403, got {response.status_code}")
                 return False
         except Exception as e:
             self.log_test("Food Logging Auth Required", False, f"Exception: {str(e)}")
