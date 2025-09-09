@@ -608,13 +608,16 @@ frontend:
     implemented: true
     working: false
     file: "/app/frontend/src/App.js"
-    stuck_count: 1
+    stuck_count: 2
     priority: "high"
     needs_retesting: false
     status_history:
         - working: false
           agent: "testing"
           comment: "❌ CRITICAL ISSUE: JWT token and user data are properly stored in localStorage after registration/login. However, when page is refreshed with valid token and user data, the app still gets stuck on 'Loading dashboard...' instead of loading the dashboard. The authentication state persistence works but dashboard data loading fails."
+        - working: false
+          agent: "testing"
+          comment: "❌ CRITICAL BUG CONFIRMED: Data persistence works correctly (token and user data stored and retrieved from localStorage), but same loadDashboardData execution issue affects page refresh scenarios. Users cannot access the app even with valid stored credentials."
 
   - task: "Onboarding Process - User Profile Creation"
     implemented: true
