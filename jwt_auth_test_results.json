@@ -1,0 +1,145 @@
+{
+  "summary": {
+    "passed": 15,
+    "total": 19,
+    "success_rate": "78.9%"
+  },
+  "results": [
+    {
+      "test": "Health Check",
+      "success": true,
+      "details": "API is healthy",
+      "response_data": null,
+      "timestamp": "2025-09-09T13:41:45.640683"
+    },
+    {
+      "test": "User Registration",
+      "success": true,
+      "details": "User registered successfully. ID: b5af35c3-2ee7-4e39-b861-392de1bbfa44, Token received",
+      "response_data": null,
+      "timestamp": "2025-09-09T13:41:46.759106"
+    },
+    {
+      "test": "User Login",
+      "success": true,
+      "details": "User logged in successfully. New token received",
+      "response_data": null,
+      "timestamp": "2025-09-09T13:41:47.823406"
+    },
+    {
+      "test": "Invalid Login",
+      "success": true,
+      "details": "Invalid credentials correctly rejected with 401",
+      "response_data": null,
+      "timestamp": "2025-09-09T13:41:48.880425"
+    },
+    {
+      "test": "Forgot Password",
+      "success": true,
+      "details": "Password reset initiated successfully",
+      "response_data": null,
+      "timestamp": "2025-09-09T13:41:49.940676"
+    },
+    {
+      "test": "Reset Password",
+      "success": true,
+      "details": "Password reset completed successfully",
+      "response_data": null,
+      "timestamp": "2025-09-09T13:41:51.159381"
+    },
+    {
+      "test": "Login with New Password",
+      "success": false,
+      "details": "Status code: 500",
+      "response_data": "{\"detail\":\"'reset_token'\"}",
+      "timestamp": "2025-09-09T13:41:52.212285"
+    },
+    {
+      "test": "Protected Endpoint Without Token",
+      "success": false,
+      "details": "Expected 401, got 403",
+      "response_data": null,
+      "timestamp": "2025-09-09T13:41:53.265242"
+    },
+    {
+      "test": "Protected Endpoint Invalid Token",
+      "success": true,
+      "details": "Protected endpoint correctly rejected invalid token (401)",
+      "response_data": null,
+      "timestamp": "2025-09-09T13:41:54.315621"
+    },
+    {
+      "test": "Protected Endpoint Valid Token",
+      "success": true,
+      "details": "Protected endpoint accessible with valid token",
+      "response_data": null,
+      "timestamp": "2025-09-09T13:41:55.368450"
+    },
+    {
+      "test": "Token Expiration Handling",
+      "success": true,
+      "details": "Expired/invalid token correctly rejected (401)",
+      "response_data": null,
+      "timestamp": "2025-09-09T13:41:56.451617"
+    },
+    {
+      "test": "Cross User Access Prevention",
+      "success": true,
+      "details": "Cross-user access correctly prevented (403)",
+      "response_data": null,
+      "timestamp": "2025-09-09T13:41:57.501005"
+    },
+    {
+      "test": "Get Current User Profile",
+      "success": true,
+      "details": "Current user profile retrieved successfully",
+      "response_data": null,
+      "timestamp": "2025-09-09T13:41:58.557267"
+    },
+    {
+      "test": "Food Logging Auth Required",
+      "success": false,
+      "details": "Expected 401, got 403",
+      "response_data": null,
+      "timestamp": "2025-09-09T13:41:59.607511"
+    },
+    {
+      "test": "Food Logging With Auth",
+      "success": true,
+      "details": "Food logging successful with authentication",
+      "response_data": null,
+      "timestamp": "2025-09-09T13:42:00.900045"
+    },
+    {
+      "test": "Daily Stats Auth Required",
+      "success": false,
+      "details": "Expected 401, got 403",
+      "response_data": null,
+      "timestamp": "2025-09-09T13:42:02.003059"
+    },
+    {
+      "test": "Daily Stats With Auth",
+      "success": true,
+      "details": "Daily stats accessible with authentication",
+      "response_data": null,
+      "timestamp": "2025-09-09T13:42:03.060985"
+    },
+    {
+      "test": "User Creation with Gamification (Legacy)",
+      "success": true,
+      "details": "Legacy endpoint removed (expected with auth system)",
+      "response_data": null,
+      "timestamp": "2025-09-09T13:42:04.108098"
+    },
+    {
+      "test": "Enhanced Food Logging Gamification",
+      "success": true,
+      "details": "Food logging with gamification successful. Points: 25, Badges: [], Streak: 1",
+      "response_data": null,
+      "timestamp": "2025-09-09T13:42:05.176819"
+    }
+  ],
+  "backend_url": "https://nutriboost-6.preview.emergentagent.com/api",
+  "test_timestamp": "2025-09-09T13:42:06.178671",
+  "test_focus": "JWT Authentication System"
+}
